@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useWallet } from "@/context/WalletContext";
 import BondingCurveChart from "./BondingCurveChart";
 import { saveToken } from "@/lib/token-store";
@@ -29,9 +30,11 @@ export default function LaunchWizard() {
   const { wallet, isConnected } = useWallet();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<TokenForm>(DEFAULTS);
+  const [logoPreview, setLogoPreview] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ categoryId: string; txId: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const update = (field: keyof TokenForm, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -40,7 +43,9 @@ export default function LaunchWizard() {
   const basePrice = parseInt(form.basePrice) || 0;
   const slopeVal = parseInt(form.slope) || 0;
 
-  const maxPrice = basePrice + slopeVal * totalSupply;
+  // Ascending bonding curve: start low, end high
+  const startPrice = basePrice;
+  const endPrice = basePrice + slopeVal * totalSupply;
   const totalCostEstimate =
     totalSupply > 0
       ? (totalSupply * basePrice + (slopeVal * totalSupply * totalSupply) / 2) / 1e8
@@ -49,6 +54,21 @@ export default function LaunchWizard() {
   const canProceedStep1 =
     form.name.length >= 2 && form.symbol.length >= 2 && form.symbol.length <= 8;
   const canProceedStep2 = totalSupply > 0 && basePrice > 0;
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500_000) {
+      setError("Image must be under 500KB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setLogoPreview(ev.target?.result as string);
+      setError("");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleLaunch = async () => {
     if (!wallet) return;
@@ -111,6 +131,7 @@ export default function LaunchWizard() {
         tokenAddress: contract.tokenAddress,
         creatorAddress: wallet.address,
         createdAt: Date.now(),
+        logoUrl: logoPreview || undefined,
       });
 
       setResult({ categoryId, txId });
@@ -124,6 +145,10 @@ export default function LaunchWizard() {
 
   const inputClass =
     "w-full bg-surface-1 border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted focus:border-brand transition-colors duration-200";
+
+  // Deterministic color from symbol for preview
+  const hue = form.symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+  const hue2 = (hue + 40) % 360;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -169,33 +194,91 @@ export default function LaunchWizard() {
           <h2 className="text-lg font-bold mb-1">Token Information</h2>
           <p className="text-sm text-text-muted mb-6">Give your token an identity</p>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
+            {/* Logo upload */}
             <div>
-              <label className="text-xs text-text-secondary mb-1.5 block font-medium">
-                Token Name
+              <label className="text-xs text-text-secondary mb-2 block font-medium">
+                Logo
               </label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => update("name", e.target.value)}
-                placeholder="e.g. CashCat"
-                className={inputClass}
-              />
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="relative w-20 h-20 rounded-2xl border-2 border-dashed border-border hover:border-brand/50 transition-colors flex items-center justify-center overflow-hidden group shrink-0"
+                >
+                  {logoPreview ? (
+                    <Image
+                      src={logoPreview}
+                      alt="Logo preview"
+                      width={80}
+                      height={80}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : form.symbol.length >= 2 ? (
+                    <div
+                      className="w-full h-full flex items-center justify-center font-bold text-lg"
+                      style={{
+                        background: `linear-gradient(135deg, hsl(${hue}, 50%, 35%), hsl(${hue2}, 50%, 25%))`,
+                        color: `hsl(${hue}, 60%, 80%)`,
+                      }}
+                    >
+                      {form.symbol.slice(0, 2)}
+                    </div>
+                  ) : (
+                    <svg className="w-6 h-6 text-text-muted group-hover:text-brand transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                    </svg>
+                  )}
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+                <div className="text-xs text-text-muted leading-relaxed">
+                  <p>Upload a logo for your token</p>
+                  <p className="mt-0.5">PNG, JPG or SVG. Max 500KB.</p>
+                  {logoPreview && (
+                    <button
+                      onClick={() => setLogoPreview("")}
+                      className="text-red-400 hover:text-red-300 mt-1"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div>
-              <label className="text-xs text-text-secondary mb-1.5 block font-medium">
-                Symbol (2-8 chars)
-              </label>
-              <input
-                type="text"
-                value={form.symbol}
-                onChange={(e) =>
-                  update("symbol", e.target.value.toUpperCase().slice(0, 8))
-                }
-                placeholder="e.g. CCAT"
-                className={`${inputClass} font-mono`}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-text-secondary mb-1.5 block font-medium">
+                  Token Name
+                </label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => update("name", e.target.value)}
+                  placeholder="e.g. CashCat"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-text-secondary mb-1.5 block font-medium">
+                  Symbol (2-8 chars)
+                </label>
+                <input
+                  type="text"
+                  value={form.symbol}
+                  onChange={(e) =>
+                    update("symbol", e.target.value.toUpperCase().slice(0, 8))
+                  }
+                  placeholder="e.g. CCAT"
+                  className={`${inputClass} font-mono`}
+                />
+              </div>
             </div>
 
             <div>
@@ -205,16 +288,20 @@ export default function LaunchWizard() {
               <textarea
                 value={form.description}
                 onChange={(e) => update("description", e.target.value)}
-                placeholder="What makes this token special?"
+                placeholder="What makes this token special? Tell the community about your project..."
                 rows={3}
                 className={`${inputClass} resize-none`}
               />
             </div>
           </div>
 
+          {error && (
+            <p className="text-red-400 text-xs mt-3">{error}</p>
+          )}
+
           <div className="flex justify-end mt-6">
             <button
-              onClick={() => setStep(2)}
+              onClick={() => { setError(""); setStep(2); }}
               disabled={!canProceedStep1}
               className="bg-brand text-surface-0 px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-brand-light transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -229,9 +316,9 @@ export default function LaunchWizard() {
         <div className="space-y-4">
           <div className="glass-card p-6 sm:p-8">
             <h2 className="text-lg font-bold mb-1">Tokenomics</h2>
-            <p className="text-sm text-text-muted mb-6">Configure your bonding curve</p>
+            <p className="text-sm text-text-muted mb-6">Configure your bonding curve parameters</p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-4">
               <div>
                 <label className="text-xs text-text-secondary mb-1.5 block font-medium">
                   Total Supply
@@ -244,50 +331,55 @@ export default function LaunchWizard() {
                   min="1"
                   className={`${inputClass} font-mono`}
                 />
+                <p className="text-[11px] text-text-muted mt-1">Total number of tokens to create</p>
               </div>
 
-              <div>
-                <label className="text-xs text-text-secondary mb-1.5 block font-medium">
-                  Base Price (sats)
-                </label>
-                <input
-                  type="number"
-                  value={form.basePrice}
-                  onChange={(e) => update("basePrice", e.target.value)}
-                  placeholder="10"
-                  min="1"
-                  className={`${inputClass} font-mono`}
-                />
-              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-text-secondary mb-1.5 block font-medium">
+                    Base Price (sats)
+                  </label>
+                  <input
+                    type="number"
+                    value={form.basePrice}
+                    onChange={(e) => update("basePrice", e.target.value)}
+                    placeholder="10"
+                    min="1"
+                    className={`${inputClass} font-mono`}
+                  />
+                  <p className="text-[11px] text-text-muted mt-1">Starting price per token</p>
+                </div>
 
-              <div>
-                <label className="text-xs text-text-secondary mb-1.5 block font-medium">
-                  Slope
-                </label>
-                <input
-                  type="number"
-                  value={form.slope}
-                  onChange={(e) => update("slope", e.target.value)}
-                  placeholder="1"
-                  min="0"
-                  className={`${inputClass} font-mono`}
-                />
+                <div>
+                  <label className="text-xs text-text-secondary mb-1.5 block font-medium">
+                    Slope (sats/token)
+                  </label>
+                  <input
+                    type="number"
+                    value={form.slope}
+                    onChange={(e) => update("slope", e.target.value)}
+                    placeholder="1"
+                    min="0"
+                    className={`${inputClass} font-mono`}
+                  />
+                  <p className="text-[11px] text-text-muted mt-1">Price increase per token sold</p>
+                </div>
               </div>
             </div>
 
             {/* Curve stats */}
             <div className="grid grid-cols-3 gap-3 mt-6">
               <div className="bg-surface-1 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">Start</p>
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Start Price</p>
                 <p className="text-sm font-mono text-brand mt-1">
-                  {basePrice + slopeVal * totalSupply}
+                  {startPrice.toLocaleString()}
                 </p>
                 <p className="text-[10px] text-text-muted">sats</p>
               </div>
               <div className="bg-surface-1 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">End</p>
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">End Price</p>
                 <p className="text-sm font-mono text-amber-400 mt-1">
-                  {maxPrice}
+                  {endPrice.toLocaleString()}
                 </p>
                 <p className="text-[10px] text-text-muted">sats</p>
               </div>
@@ -304,7 +396,7 @@ export default function LaunchWizard() {
           {/* Chart preview */}
           <div className="glass-card p-6">
             <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">
-              Curve Preview
+              Bonding Curve Preview
             </h3>
             <div className="h-56">
               <BondingCurveChart
@@ -340,14 +432,30 @@ export default function LaunchWizard() {
           <p className="text-sm text-text-muted mb-6">Confirm your token parameters</p>
 
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-surface-1 rounded-xl p-4">
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">Name</p>
-                <p className="text-text-primary font-semibold mt-1">{form.name}</p>
-              </div>
-              <div className="bg-surface-1 rounded-xl p-4">
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">Symbol</p>
-                <p className="text-text-primary font-mono mt-1">${form.symbol}</p>
+            {/* Token identity preview */}
+            <div className="bg-surface-1 rounded-xl p-4 flex items-center gap-4">
+              {logoPreview ? (
+                <Image
+                  src={logoPreview}
+                  alt="Token logo"
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 rounded-xl object-cover"
+                />
+              ) : (
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-base"
+                  style={{
+                    background: `linear-gradient(135deg, hsl(${hue}, 50%, 35%), hsl(${hue2}, 50%, 25%))`,
+                    color: `hsl(${hue}, 60%, 80%)`,
+                  }}
+                >
+                  {form.symbol.slice(0, 2)}
+                </div>
+              )}
+              <div>
+                <p className="text-text-primary font-semibold">{form.name}</p>
+                <p className="text-xs text-text-muted font-mono">${form.symbol}</p>
               </div>
             </div>
 
@@ -371,7 +479,7 @@ export default function LaunchWizard() {
               </div>
               <div className="bg-surface-1 rounded-xl p-4">
                 <p className="text-[10px] text-text-muted uppercase tracking-wider">Slope</p>
-                <p className="text-text-primary font-mono text-sm mt-1">{slopeVal}</p>
+                <p className="text-text-primary font-mono text-sm mt-1">{slopeVal} sats/token</p>
               </div>
             </div>
 

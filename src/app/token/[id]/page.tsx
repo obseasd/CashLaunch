@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import BondingCurveChart from "@/components/BondingCurveChart";
 import BuyPanel from "@/components/BuyPanel";
 import SellPanel from "@/components/SellPanel";
@@ -111,7 +112,8 @@ export default function TokenPage() {
 
   const currentSupply = contractState?.supply ?? token.totalSupply;
   const tokensSold = contractState?.tokensSold ?? 0;
-  const currentPrice = token.basePrice + token.slope * currentSupply;
+  // Ascending bonding curve: price increases with tokens sold
+  const currentPrice = token.basePrice + token.slope * tokensSold;
   const progress = (tokensSold / token.totalSupply) * 100;
 
   const hue = token.symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
@@ -130,15 +132,25 @@ export default function TokenPage() {
 
       {/* Token header */}
       <div className="flex items-center gap-4 mb-6">
-        <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-base shrink-0"
-          style={{
-            background: `linear-gradient(135deg, hsl(${hue}, 50%, 35%), hsl(${hue2}, 50%, 25%))`,
-            color: `hsl(${hue}, 60%, 80%)`,
-          }}
-        >
-          {token.symbol.slice(0, 2)}
-        </div>
+        {token.logoUrl ? (
+          <Image
+            src={token.logoUrl}
+            alt={token.symbol}
+            width={48}
+            height={48}
+            className="w-12 h-12 rounded-xl object-cover shrink-0"
+          />
+        ) : (
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-base shrink-0"
+            style={{
+              background: `linear-gradient(135deg, hsl(${hue}, 50%, 35%), hsl(${hue2}, 50%, 25%))`,
+              color: `hsl(${hue}, 60%, 80%)`,
+            }}
+          >
+            {token.symbol.slice(0, 2)}
+          </div>
+        )}
         <div>
           <h1 className="text-xl font-bold text-text-primary">{token.name}</h1>
           <p className="text-xs text-text-muted font-mono">${token.symbol}</p>

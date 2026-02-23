@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import type { LaunchedToken } from "@/lib/token-store";
 
 function formatNumber(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toString();
@@ -21,8 +23,10 @@ function timeAgo(ts: number): string {
 }
 
 export default function TokenCard({ token }: { token: LaunchedToken }) {
-  const currentPrice = token.basePrice + token.slope * (token.totalSupply * 0.1);
-  const marketCap = currentPrice * token.totalSupply;
+  // Ascending bonding curve: price = basePrice + slope * tokensSold
+  const estimatedSold = Math.floor(token.totalSupply * 0.15);
+  const currentPrice = token.basePrice + token.slope * estimatedSold;
+  const marketCapSats = currentPrice * token.totalSupply;
   const progress = Math.min(Math.random() * 60 + 10, 100);
 
   // Deterministic gradient from symbol
@@ -33,19 +37,28 @@ export default function TokenCard({ token }: { token: LaunchedToken }) {
     <Link href={`/token/${token.categoryId}`}>
       <div className="glass-card-hover p-4 cursor-pointer group">
         <div className="flex items-start gap-3">
-          {/* Token avatar */}
-          <div
-            className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shrink-0"
-            style={{
-              background: `linear-gradient(135deg, hsl(${hue}, 50%, 35%), hsl(${hue2}, 50%, 25%))`,
-              color: `hsl(${hue}, 60%, 80%)`,
-            }}
-          >
-            {token.symbol.slice(0, 2)}
-          </div>
+          {/* Token avatar / logo */}
+          {token.logoUrl ? (
+            <Image
+              src={token.logoUrl}
+              alt={token.symbol}
+              width={44}
+              height={44}
+              className="w-11 h-11 rounded-xl object-cover shrink-0"
+            />
+          ) : (
+            <div
+              className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shrink-0"
+              style={{
+                background: `linear-gradient(135deg, hsl(${hue}, 50%, 35%), hsl(${hue2}, 50%, 25%))`,
+                color: `hsl(${hue}, 60%, 80%)`,
+              }}
+            >
+              {token.symbol.slice(0, 2)}
+            </div>
+          )}
 
           <div className="flex-1 min-w-0">
-            {/* Name + time */}
             <div className="flex items-center justify-between gap-2">
               <h3 className="font-semibold text-text-primary text-sm truncate group-hover:text-brand transition-colors">
                 {token.name}
@@ -54,7 +67,6 @@ export default function TokenCard({ token }: { token: LaunchedToken }) {
                 {timeAgo(token.createdAt)}
               </span>
             </div>
-
             <p className="text-xs text-text-muted font-mono">${token.symbol}</p>
           </div>
         </div>
@@ -69,13 +81,13 @@ export default function TokenCard({ token }: { token: LaunchedToken }) {
           <div className="flex-1">
             <p className="text-[10px] text-text-muted uppercase tracking-wider">Price</p>
             <p className="text-xs font-mono text-text-primary mt-0.5">
-              {currentPrice.toFixed(0)} <span className="text-text-muted">sats</span>
+              {formatNumber(currentPrice)} <span className="text-text-muted">sats</span>
             </p>
           </div>
           <div className="flex-1">
             <p className="text-[10px] text-text-muted uppercase tracking-wider">MCap</p>
             <p className="text-xs font-mono text-text-primary mt-0.5">
-              {formatNumber(Math.round(marketCap / 1e8))} <span className="text-text-muted">BCH</span>
+              {formatNumber(marketCapSats)} <span className="text-text-muted">sats</span>
             </p>
           </div>
           <div className="flex-1">

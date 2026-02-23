@@ -15,6 +15,7 @@ export interface LaunchedToken {
   tokenAddress: string;
   creatorAddress: string;
   createdAt: number;       // timestamp
+  logoUrl?: string;        // base64 data URL or external URL
 }
 
 const STORAGE_KEY = "cashlaunch_tokens";
