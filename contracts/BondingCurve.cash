@@ -40,6 +40,38 @@ contract BondingCurve(bytes20 creatorPkh, int basePrice, int slope) {
         require(bchAdded >= cost);
     }
 
+    // Sell tokens back to the contract.
+    // Seller returns tokens, receives BCH. Contract preserves itself (covenant).
+    function sell() {
+        // COVENANT: output must preserve the contract's locking bytecode
+        require(tx.outputs[this.activeInputIndex].lockingBytecode ==
+                tx.inputs[this.activeInputIndex].lockingBytecode);
+
+        // Same token category must be preserved
+        require(tx.outputs[this.activeInputIndex].tokenCategory ==
+                tx.inputs[this.activeInputIndex].tokenCategory);
+
+        // Calculate how many tokens are being returned to the contract
+        int tokensReturned = tx.outputs[this.activeInputIndex].tokenAmount
+                           - tx.inputs[this.activeInputIndex].tokenAmount;
+        require(tokensReturned > 0);
+
+        // Calculate BCH removed from the contract
+        int bchRemoved = tx.inputs[this.activeInputIndex].value
+                       - tx.outputs[this.activeInputIndex].value;
+
+        // Current supply held by contract (before sell)
+        int currentSupply = tx.inputs[this.activeInputIndex].tokenAmount;
+
+        // Linear bonding curve refund calculation (reverse of buy):
+        // Integrating price from currentSupply to (currentSupply + tokensReturned)
+        // refund = tokensReturned * basePrice + slope * tokensReturned * (2 * currentSupply + tokensReturned) / 2
+        int refund = tokensReturned * basePrice
+                   + slope * tokensReturned * (2 * currentSupply + tokensReturned) / 2;
+
+        require(bchRemoved <= refund);
+    }
+
     // Creator can withdraw all funds + remaining tokens
     function withdraw(pubkey pk, sig s) {
         require(hash160(pk) == creatorPkh);
