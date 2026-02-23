@@ -5,55 +5,22 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useWallet } from "@/context/WalletContext";
 import BondingCurveChart from "./BondingCurveChart";
-import { saveToken } from "@/lib/token-store";
-
-interface TokenForm {
-  name: string;
-  symbol: string;
-  description: string;
-  totalSupply: string;
-  basePrice: string;
-  slope: string;
-}
-
-const DEFAULTS: TokenForm = {
-  name: "",
-  symbol: "",
-  description: "",
-  totalSupply: "1000000",
-  basePrice: "10",
-  slope: "1",
-};
+import { saveToken, CURVE } from "@/lib/token-store";
 
 export default function LaunchWizard() {
   const router = useRouter();
   const { wallet, isConnected } = useWallet();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState<TokenForm>(DEFAULTS);
-  const [logoPreview, setLogoPreview] = useState<string>("");
+  const [name, setName] = useState("");
+  const [symbol, setSymbol] = useState("");
+  const [description, setDescription] = useState("");
+  const [logoPreview, setLogoPreview] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ categoryId: string; txId: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const update = (field: keyof TokenForm, value: string) =>
-    setForm((prev) => ({ ...prev, [field]: value }));
-
-  const totalSupply = parseInt(form.totalSupply) || 0;
-  const basePrice = parseInt(form.basePrice) || 0;
-  const slopeVal = parseInt(form.slope) || 0;
-
-  // Ascending bonding curve: start low, end high
-  const startPrice = basePrice;
-  const endPrice = basePrice + slopeVal * totalSupply;
-  const totalCostEstimate =
-    totalSupply > 0
-      ? (totalSupply * basePrice + (slopeVal * totalSupply * totalSupply) / 2) / 1e8
-      : 0;
-
-  const canProceedStep1 =
-    form.name.length >= 2 && form.symbol.length >= 2 && form.symbol.length <= 8;
-  const canProceedStep2 = totalSupply > 0 && basePrice > 0;
+  const canProceedStep1 = name.length >= 2 && symbol.length >= 2 && symbol.length <= 8;
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -70,6 +37,10 @@ export default function LaunchWizard() {
     reader.readAsDataURL(file);
   };
 
+  // Deterministic color for symbol preview
+  const hue = symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+  const hue2 = (hue + 40) % 360;
+
   const handleLaunch = async () => {
     if (!wallet) return;
     setLoading(true);
@@ -81,7 +52,7 @@ export default function LaunchWizard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mnemonic: wallet.mnemonic,
-          supply: totalSupply,
+          supply: CURVE.totalSupply,
         }),
       });
 
@@ -93,13 +64,12 @@ export default function LaunchWizard() {
       const { categoryId, txId } = await genesisRes.json();
 
       const { Contract, ElectrumNetworkProvider } = await import("cashscript");
-      const artifact = (await import("@/lib/bch/artifacts/BondingCurve.json"))
-        .default;
+      const artifact = (await import("@/lib/bch/artifacts/BondingCurve.json")).default;
 
       const provider = new ElectrumNetworkProvider("chipnet");
       const contract = new Contract(
         artifact,
-        [wallet.pubkeyHash, BigInt(basePrice), BigInt(slopeVal)],
+        [wallet.pubkeyHash, BigInt(CURVE.basePrice), BigInt(CURVE.slope)],
         { provider }
       );
 
@@ -110,7 +80,7 @@ export default function LaunchWizard() {
           mnemonic: wallet.mnemonic,
           categoryId,
           contractTokenAddress: contract.tokenAddress,
-          amount: totalSupply,
+          amount: CURVE.totalSupply,
         }),
       });
 
@@ -121,12 +91,10 @@ export default function LaunchWizard() {
 
       saveToken({
         categoryId,
-        name: form.name,
-        symbol: form.symbol,
-        description: form.description,
-        totalSupply,
-        basePrice,
-        slope: slopeVal,
+        name,
+        symbol,
+        description,
+        ...CURVE,
         contractAddress: contract.address,
         tokenAddress: contract.tokenAddress,
         creatorAddress: wallet.address,
@@ -135,7 +103,7 @@ export default function LaunchWizard() {
       });
 
       setResult({ categoryId, txId });
-      setStep(4);
+      setStep(3);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Launch failed");
     } finally {
@@ -146,19 +114,14 @@ export default function LaunchWizard() {
   const inputClass =
     "w-full bg-surface-1 border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted focus:border-brand transition-colors duration-200";
 
-  // Deterministic color from symbol for preview
-  const hue = form.symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
-  const hue2 = (hue + 40) % 360;
-
   return (
     <div className="max-w-2xl mx-auto">
       {/* Progress steps */}
       <div className="flex items-center gap-2 mb-8">
         {[
-          { n: 1, label: "Info" },
-          { n: 2, label: "Tokenomics" },
-          { n: 3, label: "Review" },
-          { n: 4, label: "Live" },
+          { n: 1, label: "Token" },
+          { n: 2, label: "Launch" },
+          { n: 3, label: "Live" },
         ].map(({ n, label }) => (
           <div key={n} className="flex items-center gap-2 flex-1">
             <div
@@ -177,7 +140,7 @@ export default function LaunchWizard() {
             >
               {label}
             </span>
-            {n < 4 && (
+            {n < 3 && (
               <div
                 className={`flex-1 h-px transition-colors ${
                   step > n ? "bg-brand" : "bg-border"
@@ -188,11 +151,13 @@ export default function LaunchWizard() {
         ))}
       </div>
 
-      {/* Step 1: Token Info */}
+      {/* Step 1: Token Identity */}
       {step === 1 && (
         <div className="glass-card p-6 sm:p-8">
-          <h2 className="text-lg font-bold mb-1">Token Information</h2>
-          <p className="text-sm text-text-muted mb-6">Give your token an identity</p>
+          <h2 className="text-lg font-bold mb-1">Create your token</h2>
+          <p className="text-sm text-text-muted mb-6">
+            Pick a name, symbol and logo. The bonding curve is automatic.
+          </p>
 
           <div className="space-y-5">
             {/* Logo upload */}
@@ -209,12 +174,12 @@ export default function LaunchWizard() {
                   {logoPreview ? (
                     <Image
                       src={logoPreview}
-                      alt="Logo preview"
+                      alt="Logo"
                       width={80}
                       height={80}
                       className="w-full h-full object-cover"
                     />
-                  ) : form.symbol.length >= 2 ? (
+                  ) : symbol.length >= 2 ? (
                     <div
                       className="w-full h-full flex items-center justify-center font-bold text-lg"
                       style={{
@@ -222,7 +187,7 @@ export default function LaunchWizard() {
                         color: `hsl(${hue}, 60%, 80%)`,
                       }}
                     >
-                      {form.symbol.slice(0, 2)}
+                      {symbol.slice(0, 2)}
                     </div>
                   ) : (
                     <svg className="w-6 h-6 text-text-muted group-hover:text-brand transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -252,15 +217,16 @@ export default function LaunchWizard() {
               </div>
             </div>
 
+            {/* Name + Symbol side by side */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-text-secondary mb-1.5 block font-medium">
-                  Token Name
+                  Name
                 </label>
                 <input
                   type="text"
-                  value={form.name}
-                  onChange={(e) => update("name", e.target.value)}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. CashCat"
                   className={inputClass}
                 />
@@ -271,33 +237,30 @@ export default function LaunchWizard() {
                 </label>
                 <input
                   type="text"
-                  value={form.symbol}
-                  onChange={(e) =>
-                    update("symbol", e.target.value.toUpperCase().slice(0, 8))
-                  }
+                  value={symbol}
+                  onChange={(e) => setSymbol(e.target.value.toUpperCase().slice(0, 8))}
                   placeholder="e.g. CCAT"
                   className={`${inputClass} font-mono`}
                 />
               </div>
             </div>
 
+            {/* Description */}
             <div>
               <label className="text-xs text-text-secondary mb-1.5 block font-medium">
                 Description
               </label>
               <textarea
-                value={form.description}
-                onChange={(e) => update("description", e.target.value)}
-                placeholder="What makes this token special? Tell the community about your project..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Tell the community about your token..."
                 rows={3}
                 className={`${inputClass} resize-none`}
               />
             </div>
           </div>
 
-          {error && (
-            <p className="text-red-400 text-xs mt-3">{error}</p>
-          )}
+          {error && <p className="text-red-400 text-xs mt-3">{error}</p>}
 
           <div className="flex justify-end mt-6">
             <button
@@ -311,137 +274,20 @@ export default function LaunchWizard() {
         </div>
       )}
 
-      {/* Step 2: Tokenomics */}
+      {/* Step 2: Preview & Launch */}
       {step === 2 && (
         <div className="space-y-4">
+          {/* Token preview card */}
           <div className="glass-card p-6 sm:p-8">
-            <h2 className="text-lg font-bold mb-1">Tokenomics</h2>
-            <p className="text-sm text-text-muted mb-6">Configure your bonding curve parameters</p>
+            <h2 className="text-lg font-bold mb-1">Review & Launch</h2>
+            <p className="text-sm text-text-muted mb-6">
+              Your token will launch with a fixed bonding curve — just like pump.fun
+            </p>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-text-secondary mb-1.5 block font-medium">
-                  Total Supply
-                </label>
-                <input
-                  type="number"
-                  value={form.totalSupply}
-                  onChange={(e) => update("totalSupply", e.target.value)}
-                  placeholder="1000000"
-                  min="1"
-                  className={`${inputClass} font-mono`}
-                />
-                <p className="text-[11px] text-text-muted mt-1">Total number of tokens to create</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-text-secondary mb-1.5 block font-medium">
-                    Base Price (sats)
-                  </label>
-                  <input
-                    type="number"
-                    value={form.basePrice}
-                    onChange={(e) => update("basePrice", e.target.value)}
-                    placeholder="10"
-                    min="1"
-                    className={`${inputClass} font-mono`}
-                  />
-                  <p className="text-[11px] text-text-muted mt-1">Starting price per token</p>
-                </div>
-
-                <div>
-                  <label className="text-xs text-text-secondary mb-1.5 block font-medium">
-                    Slope (sats/token)
-                  </label>
-                  <input
-                    type="number"
-                    value={form.slope}
-                    onChange={(e) => update("slope", e.target.value)}
-                    placeholder="1"
-                    min="0"
-                    className={`${inputClass} font-mono`}
-                  />
-                  <p className="text-[11px] text-text-muted mt-1">Price increase per token sold</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Curve stats */}
-            <div className="grid grid-cols-3 gap-3 mt-6">
-              <div className="bg-surface-1 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">Start Price</p>
-                <p className="text-sm font-mono text-brand mt-1">
-                  {startPrice.toLocaleString()}
-                </p>
-                <p className="text-[10px] text-text-muted">sats</p>
-              </div>
-              <div className="bg-surface-1 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">End Price</p>
-                <p className="text-sm font-mono text-amber-400 mt-1">
-                  {endPrice.toLocaleString()}
-                </p>
-                <p className="text-[10px] text-text-muted">sats</p>
-              </div>
-              <div className="bg-surface-1 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">FDV</p>
-                <p className="text-sm font-mono text-text-primary mt-1">
-                  {totalCostEstimate.toFixed(4)}
-                </p>
-                <p className="text-[10px] text-text-muted">BCH</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Chart preview */}
-          <div className="glass-card p-6">
-            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">
-              Bonding Curve Preview
-            </h3>
-            <div className="h-56">
-              <BondingCurveChart
-                basePrice={basePrice}
-                slope={slopeVal}
-                totalSupply={totalSupply}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-between">
-            <button
-              onClick={() => setStep(1)}
-              className="text-text-muted hover:text-text-secondary transition-colors px-4 py-2 text-sm"
-            >
-              Back
-            </button>
-            <button
-              onClick={() => setStep(3)}
-              disabled={!canProceedStep2}
-              className="bg-brand text-surface-0 px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-brand-light transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Review */}
-      {step === 3 && (
-        <div className="glass-card p-6 sm:p-8">
-          <h2 className="text-lg font-bold mb-1">Review & Launch</h2>
-          <p className="text-sm text-text-muted mb-6">Confirm your token parameters</p>
-
-          <div className="space-y-3">
-            {/* Token identity preview */}
-            <div className="bg-surface-1 rounded-xl p-4 flex items-center gap-4">
+            {/* Token identity */}
+            <div className="bg-surface-1 rounded-xl p-4 flex items-center gap-4 mb-5">
               {logoPreview ? (
-                <Image
-                  src={logoPreview}
-                  alt="Token logo"
-                  width={48}
-                  height={48}
-                  className="w-12 h-12 rounded-xl object-cover"
-                />
+                <Image src={logoPreview} alt="Logo" width={48} height={48} className="w-12 h-12 rounded-xl object-cover" />
               ) : (
                 <div
                   className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-base"
@@ -450,54 +296,74 @@ export default function LaunchWizard() {
                     color: `hsl(${hue}, 60%, 80%)`,
                   }}
                 >
-                  {form.symbol.slice(0, 2)}
+                  {symbol.slice(0, 2)}
                 </div>
               )}
               <div>
-                <p className="text-text-primary font-semibold">{form.name}</p>
-                <p className="text-xs text-text-muted font-mono">${form.symbol}</p>
+                <p className="text-text-primary font-semibold">{name}</p>
+                <p className="text-xs text-text-muted font-mono">${symbol}</p>
               </div>
             </div>
 
-            {form.description && (
-              <div className="bg-surface-1 rounded-xl p-4">
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">Description</p>
-                <p className="text-text-secondary text-sm mt-1">{form.description}</p>
-              </div>
+            {description && (
+              <p className="text-sm text-text-secondary mb-5 leading-relaxed">{description}</p>
             )}
 
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-surface-1 rounded-xl p-4">
+            {/* Fixed curve parameters */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+              <div className="bg-surface-1 rounded-xl p-3 text-center">
                 <p className="text-[10px] text-text-muted uppercase tracking-wider">Supply</p>
-                <p className="text-text-primary font-mono text-sm mt-1">
-                  {totalSupply.toLocaleString()}
+                <p className="text-sm font-mono text-text-primary mt-1">
+                  {CURVE.totalSupply.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-surface-1 rounded-xl p-4">
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">Base Price</p>
-                <p className="text-text-primary font-mono text-sm mt-1">{basePrice} sats</p>
+              <div className="bg-surface-1 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Start Price</p>
+                <p className="text-sm font-mono text-brand mt-1">
+                  {CURVE.basePrice}
+                </p>
+                <p className="text-[10px] text-text-muted">sats</p>
               </div>
-              <div className="bg-surface-1 rounded-xl p-4">
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">Slope</p>
-                <p className="text-text-primary font-mono text-sm mt-1">{slopeVal} sats/token</p>
+              <div className="bg-surface-1 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">End Price</p>
+                <p className="text-sm font-mono text-amber-400 mt-1">
+                  {(CURVE.basePrice + CURVE.slope * CURVE.totalSupply).toLocaleString()}
+                </p>
+                <p className="text-[10px] text-text-muted">sats</p>
+              </div>
+              <div className="bg-surface-1 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Network</p>
+                <p className="text-sm font-mono text-text-primary mt-1">Chipnet</p>
               </div>
             </div>
+          </div>
 
-            <div className="bg-surface-1 rounded-xl p-4">
-              <p className="text-[10px] text-text-muted uppercase tracking-wider">Network</p>
-              <p className="text-text-primary text-sm mt-1">BCH Chipnet (Testnet)</p>
+          {/* Bonding curve chart */}
+          <div className="glass-card p-6">
+            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">
+              Bonding Curve
+            </h3>
+            <p className="text-[11px] text-text-muted mb-4">
+              Price increases automatically as more tokens are bought
+            </p>
+            <div className="h-56">
+              <BondingCurveChart
+                basePrice={CURVE.basePrice}
+                slope={CURVE.slope}
+                totalSupply={CURVE.totalSupply}
+              />
             </div>
           </div>
 
           {error && (
-            <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
               <p className="text-red-400 text-sm break-all">{error}</p>
             </div>
           )}
 
-          <div className="flex justify-between mt-6">
+          <div className="flex justify-between">
             <button
-              onClick={() => setStep(2)}
+              onClick={() => setStep(1)}
               className="text-text-muted hover:text-text-secondary transition-colors px-4 py-2 text-sm"
             >
               Back
@@ -526,8 +392,8 @@ export default function LaunchWizard() {
         </div>
       )}
 
-      {/* Step 4: Success */}
-      {step === 4 && result && (
+      {/* Step 3: Success */}
+      {step === 3 && result && (
         <div className="glass-card p-8 sm:p-10 text-center border-brand/20">
           <div className="w-16 h-16 rounded-full bg-brand/15 flex items-center justify-center mx-auto mb-5">
             <span className="text-3xl text-brand">&#10003;</span>
@@ -536,7 +402,7 @@ export default function LaunchWizard() {
             Token Launched!
           </h2>
           <p className="text-text-secondary text-sm mb-6">
-            {form.name} (${form.symbol}) is now live on chipnet
+            {name} (${symbol}) is now live on chipnet
           </p>
 
           <div className="bg-surface-1 rounded-xl p-4 mb-6 text-left">
