@@ -3,30 +3,45 @@
 @tailwind utilities;
 
 :root {
-  --background: #030712;
-  --foreground: #f3f4f6;
-  --surface: #111827;
-  --surface-light: #1f2937;
-  --border: #374151;
-  --muted: #9ca3af;
+  --bg: #060609;
+  --surface-1: #0c0d12;
+  --surface-2: #141520;
+  --surface-3: #1a1c28;
+  --border: #1e2030;
+  --border-hover: #2a2d40;
+  --text-primary: #f0f0f5;
+  --text-secondary: #8b8da0;
+  --text-muted: #4a4c5e;
+  --brand: #12c89f;
+  --brand-light: #15dfb2;
+  --brand-dark: #0fa882;
+  --red: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  color: var(--text-primary);
+  background: var(--bg);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — thin + minimal */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--surface);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+  background: var(--border-hover);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 /* Number input arrows removal */
@@ -37,4 +52,27 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/* Smooth focus rings */
+input:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: none;
+}
+
+/* Selection color */
+::selection {
+  background: rgba(18, 200, 159, 0.3);
+  color: #f0f0f5;
+}
+
+/* Glass card utility */
+@layer utilities {
+  .glass-card {
+    @apply bg-surface-2 border border-border rounded-2xl;
+  }
+  .glass-card-hover {
+    @apply glass-card hover:border-border-hover hover:bg-surface-3 transition-all duration-200;
+  }
 }

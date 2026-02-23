@@ -11,87 +11,96 @@ function formatNumber(n: number): string {
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
-  const hours = Math.floor(diff / 3600000);
-  if (hours < 1) return "just now";
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
 }
 
 export default function TokenCard({ token }: { token: LaunchedToken }) {
-  // Calculate current price based on how many tokens have been "sold"
-  // For demo purposes, estimate progress
   const currentPrice = token.basePrice + token.slope * (token.totalSupply * 0.1);
   const marketCap = currentPrice * token.totalSupply;
-  const progress = Math.min(Math.random() * 60 + 10, 100); // demo randomized
+  const progress = Math.min(Math.random() * 60 + 10, 100);
 
-  // Generate a deterministic color from symbol
+  // Deterministic gradient from symbol
   const hue = token.symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+  const hue2 = (hue + 40) % 360;
 
   return (
     <Link href={`/token/${token.categoryId}`}>
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-gray-700 hover:bg-gray-900/80 transition-all cursor-pointer group">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
+      <div className="glass-card-hover p-4 cursor-pointer group">
+        <div className="flex items-start gap-3">
+          {/* Token avatar */}
           <div
-            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
+            className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shrink-0"
             style={{
-              backgroundColor: `hsl(${hue}, 60%, 30%)`,
+              background: `linear-gradient(135deg, hsl(${hue}, 50%, 35%), hsl(${hue2}, 50%, 25%))`,
               color: `hsl(${hue}, 60%, 80%)`,
             }}
           >
             {token.symbol.slice(0, 2)}
           </div>
+
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-100 truncate group-hover:text-bch-green transition-colors">
-              {token.name}
-            </h3>
-            <p className="text-xs text-gray-500 font-mono">${token.symbol}</p>
+            {/* Name + time */}
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-semibold text-text-primary text-sm truncate group-hover:text-brand transition-colors">
+                {token.name}
+              </h3>
+              <span className="text-[11px] text-text-muted shrink-0">
+                {timeAgo(token.createdAt)}
+              </span>
+            </div>
+
+            <p className="text-xs text-text-muted font-mono">${token.symbol}</p>
           </div>
-          <span className="text-xs text-gray-600">{timeAgo(token.createdAt)}</span>
         </div>
 
         {/* Description */}
-        <p className="text-xs text-gray-500 mb-4 line-clamp-2">
+        <p className="text-xs text-text-secondary mt-3 line-clamp-2 leading-relaxed">
           {token.description}
         </p>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div>
-            <p className="text-xs text-gray-600">Price</p>
-            <p className="text-sm font-mono text-gray-300">
-              {currentPrice.toFixed(0)} sats
+        {/* Stats row */}
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border">
+          <div className="flex-1">
+            <p className="text-[10px] text-text-muted uppercase tracking-wider">Price</p>
+            <p className="text-xs font-mono text-text-primary mt-0.5">
+              {currentPrice.toFixed(0)} <span className="text-text-muted">sats</span>
             </p>
           </div>
-          <div>
-            <p className="text-xs text-gray-600">Market Cap</p>
-            <p className="text-sm font-mono text-gray-300">
-              {formatNumber(Math.round(marketCap / 1e8))} BCH
+          <div className="flex-1">
+            <p className="text-[10px] text-text-muted uppercase tracking-wider">MCap</p>
+            <p className="text-xs font-mono text-text-primary mt-0.5">
+              {formatNumber(Math.round(marketCap / 1e8))} <span className="text-text-muted">BCH</span>
+            </p>
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] text-text-muted uppercase tracking-wider">Supply</p>
+            <p className="text-xs font-mono text-text-primary mt-0.5">
+              {formatNumber(token.totalSupply)}
             </p>
           </div>
         </div>
 
-        {/* Bonding curve progress */}
-        <div>
-          <div className="flex justify-between text-xs text-gray-600 mb-1">
-            <span>Bonding Curve</span>
-            <span>{progress.toFixed(0)}%</span>
+        {/* Progress bar */}
+        <div className="mt-3">
+          <div className="flex justify-between text-[10px] mb-1">
+            <span className="text-text-muted">Bonding Curve</span>
+            <span className="text-brand font-mono">{progress.toFixed(0)}%</span>
           </div>
-          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+          <div className="h-1 bg-surface-1 rounded-full overflow-hidden">
             <div
-              className="h-full bg-bch-green rounded-full transition-all"
-              style={{ width: `${progress}%` }}
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${progress}%`,
+                background: "linear-gradient(90deg, #12c89f, #15dfb2)",
+              }}
             />
           </div>
-        </div>
-
-        {/* Supply */}
-        <div className="mt-3 flex justify-between text-xs text-gray-600">
-          <span>Supply: {formatNumber(token.totalSupply)}</span>
-          <span>
-            Base: {token.basePrice} · Slope: {token.slope}
-          </span>
         </div>
       </div>
     </Link>

@@ -56,7 +56,6 @@ export default function LaunchWizard() {
     setError("");
 
     try {
-      // Step 1: Create token via API route (mainnet-js needs Node.js)
       const genesisRes = await fetch("/api/token/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -73,7 +72,6 @@ export default function LaunchWizard() {
 
       const { categoryId, txId } = await genesisRes.json();
 
-      // Step 2: Fund contract — send tokens to bonding curve contract address
       const { Contract, ElectrumNetworkProvider } = await import("cashscript");
       const artifact = (await import("@/lib/bch/artifacts/BondingCurve.json"))
         .default;
@@ -85,7 +83,6 @@ export default function LaunchWizard() {
         { provider }
       );
 
-      // Send tokens to contract via API route
       const fundRes = await fetch("/api/token/fund-contract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -102,7 +99,6 @@ export default function LaunchWizard() {
         throw new Error(errData.error || "Failed to fund contract");
       }
 
-      // Save to local store
       saveToken({
         categoryId,
         name: form.name,
@@ -126,37 +122,40 @@ export default function LaunchWizard() {
     }
   };
 
+  const inputClass =
+    "w-full bg-surface-1 border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted focus:border-brand transition-colors duration-200";
+
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-2xl mx-auto">
       {/* Progress steps */}
       <div className="flex items-center gap-2 mb-8">
         {[
-          { n: 1, label: "Token Info" },
+          { n: 1, label: "Info" },
           { n: 2, label: "Tokenomics" },
           { n: 3, label: "Review" },
-          { n: 4, label: "Deployed" },
+          { n: 4, label: "Live" },
         ].map(({ n, label }) => (
           <div key={n} className="flex items-center gap-2 flex-1">
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
                 step >= n
-                  ? "bg-bch-green text-gray-950"
-                  : "bg-gray-800 text-gray-500"
+                  ? "bg-brand text-surface-0"
+                  : "bg-surface-2 text-text-muted"
               }`}
             >
               {step > n ? "\u2713" : n}
             </div>
             <span
-              className={`text-xs hidden sm:block ${
-                step >= n ? "text-gray-300" : "text-gray-600"
+              className={`text-xs hidden sm:block transition-colors ${
+                step >= n ? "text-text-secondary" : "text-text-muted"
               }`}
             >
               {label}
             </span>
             {n < 4 && (
               <div
-                className={`flex-1 h-px ${
-                  step > n ? "bg-bch-green" : "bg-gray-800"
+                className={`flex-1 h-px transition-colors ${
+                  step > n ? "bg-brand" : "bg-border"
                 }`}
               />
             )}
@@ -166,12 +165,13 @@ export default function LaunchWizard() {
 
       {/* Step 1: Token Info */}
       {step === 1 && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <h2 className="text-xl font-bold mb-6">Token Information</h2>
+        <div className="glass-card p-6 sm:p-8">
+          <h2 className="text-lg font-bold mb-1">Token Information</h2>
+          <p className="text-sm text-text-muted mb-6">Give your token an identity</p>
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">
+              <label className="text-xs text-text-secondary mb-1.5 block font-medium">
                 Token Name
               </label>
               <input
@@ -179,12 +179,12 @@ export default function LaunchWizard() {
                 value={form.name}
                 onChange={(e) => update("name", e.target.value)}
                 placeholder="e.g. CashCat"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-bch-green transition-colors"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">
+              <label className="text-xs text-text-secondary mb-1.5 block font-medium">
                 Symbol (2-8 chars)
               </label>
               <input
@@ -194,12 +194,12 @@ export default function LaunchWizard() {
                   update("symbol", e.target.value.toUpperCase().slice(0, 8))
                 }
                 placeholder="e.g. CCAT"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 font-mono focus:outline-none focus:border-bch-green transition-colors"
+                className={`${inputClass} font-mono`}
               />
             </div>
 
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">
+              <label className="text-xs text-text-secondary mb-1.5 block font-medium">
                 Description
               </label>
               <textarea
@@ -207,7 +207,7 @@ export default function LaunchWizard() {
                 onChange={(e) => update("description", e.target.value)}
                 placeholder="What makes this token special?"
                 rows={3}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-bch-green transition-colors resize-none"
+                className={`${inputClass} resize-none`}
               />
             </div>
           </div>
@@ -216,9 +216,9 @@ export default function LaunchWizard() {
             <button
               onClick={() => setStep(2)}
               disabled={!canProceedStep1}
-              className="bg-bch-green text-gray-950 px-6 py-2.5 rounded-lg font-semibold hover:bg-bch-green-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-brand text-surface-0 px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-brand-light transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Next: Tokenomics
+              Continue
             </button>
           </div>
         </div>
@@ -226,13 +226,14 @@ export default function LaunchWizard() {
 
       {/* Step 2: Tokenomics */}
       {step === 2 && (
-        <div className="space-y-6">
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <h2 className="text-xl font-bold mb-6">Tokenomics</h2>
+        <div className="space-y-4">
+          <div className="glass-card p-6 sm:p-8">
+            <h2 className="text-lg font-bold mb-1">Tokenomics</h2>
+            <p className="text-sm text-text-muted mb-6">Configure your bonding curve</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">
+                <label className="text-xs text-text-secondary mb-1.5 block font-medium">
                   Total Supply
                 </label>
                 <input
@@ -241,12 +242,12 @@ export default function LaunchWizard() {
                   onChange={(e) => update("totalSupply", e.target.value)}
                   placeholder="1000000"
                   min="1"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 font-mono focus:outline-none focus:border-bch-green transition-colors"
+                  className={`${inputClass} font-mono`}
                 />
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">
+                <label className="text-xs text-text-secondary mb-1.5 block font-medium">
                   Base Price (sats)
                 </label>
                 <input
@@ -255,13 +256,13 @@ export default function LaunchWizard() {
                   onChange={(e) => update("basePrice", e.target.value)}
                   placeholder="10"
                   min="1"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 font-mono focus:outline-none focus:border-bch-green transition-colors"
+                  className={`${inputClass} font-mono`}
                 />
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">
-                  Slope (sats/token)
+                <label className="text-xs text-text-secondary mb-1.5 block font-medium">
+                  Slope
                 </label>
                 <input
                   type="number"
@@ -269,40 +270,43 @@ export default function LaunchWizard() {
                   onChange={(e) => update("slope", e.target.value)}
                   placeholder="1"
                   min="0"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 font-mono focus:outline-none focus:border-bch-green transition-colors"
+                  className={`${inputClass} font-mono`}
                 />
               </div>
             </div>
 
-            {/* Stats preview */}
-            <div className="grid grid-cols-3 gap-4 mt-6">
-              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-500">Start Price</p>
-                <p className="text-lg font-mono text-bch-green">
-                  {basePrice + slopeVal * totalSupply} sats
+            {/* Curve stats */}
+            <div className="grid grid-cols-3 gap-3 mt-6">
+              <div className="bg-surface-1 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Start</p>
+                <p className="text-sm font-mono text-brand mt-1">
+                  {basePrice + slopeVal * totalSupply}
                 </p>
+                <p className="text-[10px] text-text-muted">sats</p>
               </div>
-              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-500">End Price</p>
-                <p className="text-lg font-mono text-yellow-400">
-                  {maxPrice} sats
+              <div className="bg-surface-1 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">End</p>
+                <p className="text-sm font-mono text-amber-400 mt-1">
+                  {maxPrice}
                 </p>
+                <p className="text-[10px] text-text-muted">sats</p>
               </div>
-              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-500">Fully Diluted</p>
-                <p className="text-lg font-mono text-gray-300">
-                  {totalCostEstimate.toFixed(4)} BCH
+              <div className="bg-surface-1 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">FDV</p>
+                <p className="text-sm font-mono text-text-primary mt-1">
+                  {totalCostEstimate.toFixed(4)}
                 </p>
+                <p className="text-[10px] text-text-muted">BCH</p>
               </div>
             </div>
           </div>
 
-          {/* Live chart preview */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <h3 className="text-sm font-semibold text-gray-400 mb-4">
-              Bonding Curve Preview
+          {/* Chart preview */}
+          <div className="glass-card p-6">
+            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">
+              Curve Preview
             </h3>
-            <div className="h-64">
+            <div className="h-56">
               <BondingCurveChart
                 basePrice={basePrice}
                 slope={slopeVal}
@@ -314,90 +318,100 @@ export default function LaunchWizard() {
           <div className="flex justify-between">
             <button
               onClick={() => setStep(1)}
-              className="text-gray-400 hover:text-gray-200 transition-colors px-4 py-2"
+              className="text-text-muted hover:text-text-secondary transition-colors px-4 py-2 text-sm"
             >
               Back
             </button>
             <button
               onClick={() => setStep(3)}
               disabled={!canProceedStep2}
-              className="bg-bch-green text-gray-950 px-6 py-2.5 rounded-lg font-semibold hover:bg-bch-green-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-brand text-surface-0 px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-brand-light transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Next: Review
+              Continue
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 3: Review & Confirm */}
+      {/* Step 3: Review */}
       {step === 3 && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <h2 className="text-xl font-bold mb-6">Review & Launch</h2>
+        <div className="glass-card p-6 sm:p-8">
+          <h2 className="text-lg font-bold mb-1">Review & Launch</h2>
+          <p className="text-sm text-text-muted mb-6">Confirm your token parameters</p>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <p className="text-xs text-gray-500">Name</p>
-                <p className="text-gray-100 font-semibold">{form.name}</p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-surface-1 rounded-xl p-4">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Name</p>
+                <p className="text-text-primary font-semibold mt-1">{form.name}</p>
               </div>
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <p className="text-xs text-gray-500">Symbol</p>
-                <p className="text-gray-100 font-mono">${form.symbol}</p>
+              <div className="bg-surface-1 rounded-xl p-4">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Symbol</p>
+                <p className="text-text-primary font-mono mt-1">${form.symbol}</p>
               </div>
             </div>
 
             {form.description && (
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <p className="text-xs text-gray-500">Description</p>
-                <p className="text-gray-300 text-sm">{form.description}</p>
+              <div className="bg-surface-1 rounded-xl p-4">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Description</p>
+                <p className="text-text-secondary text-sm mt-1">{form.description}</p>
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <p className="text-xs text-gray-500">Supply</p>
-                <p className="text-gray-100 font-mono">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-surface-1 rounded-xl p-4">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Supply</p>
+                <p className="text-text-primary font-mono text-sm mt-1">
                   {totalSupply.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <p className="text-xs text-gray-500">Base Price</p>
-                <p className="text-gray-100 font-mono">{basePrice} sats</p>
+              <div className="bg-surface-1 rounded-xl p-4">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Base Price</p>
+                <p className="text-text-primary font-mono text-sm mt-1">{basePrice} sats</p>
               </div>
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <p className="text-xs text-gray-500">Slope</p>
-                <p className="text-gray-100 font-mono">{slopeVal} sats/token</p>
+              <div className="bg-surface-1 rounded-xl p-4">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Slope</p>
+                <p className="text-text-primary font-mono text-sm mt-1">{slopeVal}</p>
               </div>
             </div>
 
-            <div className="bg-gray-800/50 rounded-lg p-4">
-              <p className="text-xs text-gray-500">Network</p>
-              <p className="text-gray-100">BCH Chipnet (Testnet)</p>
+            <div className="bg-surface-1 rounded-xl p-4">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider">Network</p>
+              <p className="text-text-primary text-sm mt-1">BCH Chipnet (Testnet)</p>
             </div>
           </div>
 
           {error && (
-            <p className="text-red-400 text-sm mt-4 break-all">{error}</p>
+            <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <p className="text-red-400 text-sm break-all">{error}</p>
+            </div>
           )}
 
           <div className="flex justify-between mt-6">
             <button
               onClick={() => setStep(2)}
-              className="text-gray-400 hover:text-gray-200 transition-colors px-4 py-2"
+              className="text-text-muted hover:text-text-secondary transition-colors px-4 py-2 text-sm"
             >
               Back
             </button>
             {!isConnected ? (
-              <p className="text-gray-500 text-sm self-center">
+              <p className="text-text-muted text-sm self-center">
                 Connect wallet to launch
               </p>
             ) : (
               <button
                 onClick={handleLaunch}
                 disabled={loading}
-                className="bg-bch-green text-gray-950 px-8 py-3 rounded-lg font-bold text-lg hover:bg-bch-green-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-brand text-surface-0 px-8 py-3 rounded-xl font-bold text-sm hover:bg-brand-light transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-[0_0_24px_rgba(18,200,159,0.25)]"
               >
-                {loading ? "Deploying..." : "Launch Token"}
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-surface-0/30 border-t-surface-0 rounded-full animate-spin" />
+                    Deploying...
+                  </span>
+                ) : (
+                  "Launch Token"
+                )}
               </button>
             )}
           </div>
@@ -406,36 +420,38 @@ export default function LaunchWizard() {
 
       {/* Step 4: Success */}
       {step === 4 && result && (
-        <div className="bg-gray-900 border border-green-800/30 rounded-xl p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-bch-green/20 flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl text-bch-green">&#10003;</span>
+        <div className="glass-card p-8 sm:p-10 text-center border-brand/20">
+          <div className="w-16 h-16 rounded-full bg-brand/15 flex items-center justify-center mx-auto mb-5">
+            <span className="text-3xl text-brand">&#10003;</span>
           </div>
-          <h2 className="text-2xl font-bold text-gray-100 mb-2">
+          <h2 className="text-xl font-bold text-text-primary mb-2">
             Token Launched!
           </h2>
-          <p className="text-gray-400 mb-6">
+          <p className="text-text-secondary text-sm mb-6">
             {form.name} (${form.symbol}) is now live on chipnet
           </p>
 
-          <div className="bg-gray-800/50 rounded-lg p-4 mb-6 text-left">
-            <p className="text-xs text-gray-500 mb-1">Category ID</p>
-            <p className="text-sm font-mono text-bch-green break-all">
+          <div className="bg-surface-1 rounded-xl p-4 mb-6 text-left">
+            <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1">
+              Category ID
+            </p>
+            <p className="text-xs font-mono text-brand break-all">
               {result.categoryId}
             </p>
           </div>
 
-          <div className="flex gap-4 justify-center">
+          <div className="flex gap-3 justify-center">
             <button
               onClick={() => router.push(`/token/${result.categoryId}`)}
-              className="bg-bch-green text-gray-950 px-6 py-2.5 rounded-lg font-semibold hover:bg-bch-green-light transition-colors"
+              className="bg-brand text-surface-0 px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-brand-light transition-all duration-200"
             >
               View Token
             </button>
             <button
               onClick={() => router.push("/")}
-              className="bg-gray-800 text-gray-300 px-6 py-2.5 rounded-lg font-semibold hover:bg-gray-700 transition-colors"
+              className="bg-surface-2 text-text-secondary px-6 py-2.5 rounded-xl font-semibold text-sm border border-border hover:border-border-hover transition-all duration-200"
             >
-              Back to Home
+              Home
             </button>
           </div>
         </div>

@@ -16,9 +16,13 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "CashLaunch — CashTokens Launchpad on Bitcoin Cash",
+  title: "CashLaunch — CashTokens Launchpad",
   description:
-    "Launch your CashToken with instant bonding curve liquidity. No DEX listing needed.",
+    "Launch your CashToken with instant bonding curve liquidity on Bitcoin Cash.",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -29,11 +33,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-950 text-gray-100 min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-surface-0 text-text-primary min-h-screen`}
       >
         <WalletProvider>
           <Header />
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6">
             {children}
           </main>
         </WalletProvider>

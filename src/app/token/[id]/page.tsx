@@ -8,10 +8,13 @@ import BuyPanel from "@/components/BuyPanel";
 import SellPanel from "@/components/SellPanel";
 import { getTokenById, type LaunchedToken } from "@/lib/token-store";
 
+type TradeTab = "buy" | "sell";
+
 export default function TokenPage() {
   const params = useParams();
   const id = params.id as string;
   const [token, setToken] = useState<LaunchedToken | null>(null);
+  const [tab, setTab] = useState<TradeTab>("buy");
   const [contractState, setContractState] = useState<{
     supply: number;
     bchBalance: number;
@@ -27,7 +30,6 @@ export default function TokenPage() {
   // Fetch live contract state
   useEffect(() => {
     if (!token || token.categoryId.startsWith("demo-")) {
-      // For demo tokens, show simulated state
       if (token) {
         const sold = Math.floor(token.totalSupply * 0.15);
         setContractState({
@@ -50,8 +52,6 @@ export default function TokenPage() {
 
         const provider = new ElectrumNetworkProvider("chipnet");
 
-        // We need the wallet context to know the pubkey hash used for this contract
-        // For now, try to reconstruct from localStorage
         const mnemonic = localStorage.getItem("cashlaunch_mnemonic");
         if (!mnemonic) return;
 
@@ -101,8 +101,8 @@ export default function TokenPage() {
   if (!token) {
     return (
       <div className="text-center py-20">
-        <p className="text-gray-500 text-lg">Token not found</p>
-        <Link href="/" className="text-bch-green hover:underline mt-4 inline-block">
+        <p className="text-text-muted text-sm">Token not found</p>
+        <Link href="/" className="text-brand hover:text-brand-light mt-4 inline-block text-sm">
           Back to home
         </Link>
       </div>
@@ -114,61 +114,61 @@ export default function TokenPage() {
   const currentPrice = token.basePrice + token.slope * currentSupply;
   const progress = (tokensSold / token.totalSupply) * 100;
 
-  // Generate a deterministic color from symbol
   const hue = token.symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+  const hue2 = (hue + 40) % 360;
 
   return (
-    <div className="py-4">
+    <div className="py-2">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <Link href="/" className="hover:text-gray-300 transition-colors">
+      <div className="flex items-center gap-2 text-xs text-text-muted mb-6">
+        <Link href="/" className="hover:text-text-secondary transition-colors">
           Home
         </Link>
-        <span>/</span>
-        <span className="text-gray-300">{token.name}</span>
+        <span className="text-text-muted/50">/</span>
+        <span className="text-text-secondary">{token.name}</span>
       </div>
 
       {/* Token header */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex items-center gap-4 mb-6">
         <div
-          className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-lg"
+          className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-base shrink-0"
           style={{
-            backgroundColor: `hsl(${hue}, 60%, 30%)`,
+            background: `linear-gradient(135deg, hsl(${hue}, 50%, 35%), hsl(${hue2}, 50%, 25%))`,
             color: `hsl(${hue}, 60%, 80%)`,
           }}
         >
           {token.symbol.slice(0, 2)}
         </div>
         <div>
-          <h1 className="text-2xl font-bold">{token.name}</h1>
-          <p className="text-gray-500 font-mono">${token.symbol}</p>
+          <h1 className="text-xl font-bold text-text-primary">{token.name}</h1>
+          <p className="text-xs text-text-muted font-mono">${token.symbol}</p>
         </div>
         <div className="ml-auto text-right">
-          <p className="text-2xl font-bold font-mono text-bch-green">
-            {currentPrice} <span className="text-sm text-gray-500">sats</span>
+          <p className="text-xl font-bold font-mono text-brand">
+            {currentPrice.toLocaleString()} <span className="text-xs text-text-muted font-normal">sats</span>
           </p>
-          <p className="text-xs text-gray-500">current price</p>
+          <p className="text-[11px] text-text-muted">current price</p>
         </div>
       </div>
 
-      {/* Main content grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Chart + Info */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Bonding curve chart */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-400">
+      {/* Main grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        {/* Left: Chart + Info (3 cols) */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Chart */}
+          <div className="glass-card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
                 Bonding Curve
               </h2>
               <button
                 onClick={() => setRefreshKey((k) => k + 1)}
-                className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                className="text-[11px] text-text-muted hover:text-text-secondary transition-colors"
               >
                 Refresh
               </button>
             </div>
-            <div className="h-72">
+            <div className="h-64">
               <BondingCurveChart
                 basePrice={token.basePrice}
                 slope={token.slope}
@@ -179,108 +179,150 @@ export default function TokenPage() {
           </div>
 
           {/* Progress */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-400">Bonding Curve Progress</span>
-              <span className="text-bch-green font-mono">
+          <div className="glass-card p-5">
+            <div className="flex justify-between text-xs mb-2">
+              <span className="text-text-muted">Bonding Curve Progress</span>
+              <span className="text-brand font-mono font-medium">
                 {progress.toFixed(1)}%
               </span>
             </div>
-            <div className="h-3 bg-gray-800 rounded-full overflow-hidden">
+            <div className="h-2 bg-surface-1 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-bch-green to-bch-green-light rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(progress, 100)}%` }}
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${Math.min(progress, 100)}%`,
+                  background: "linear-gradient(90deg, #12c89f, #15dfb2)",
+                }}
               />
             </div>
             <div className="grid grid-cols-3 gap-4 mt-4">
               <div>
-                <p className="text-xs text-gray-600">Tokens Sold</p>
-                <p className="text-sm font-mono text-gray-300">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Sold</p>
+                <p className="text-sm font-mono text-text-primary mt-0.5">
                   {tokensSold.toLocaleString()}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-600">Remaining</p>
-                <p className="text-sm font-mono text-gray-300">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Remaining</p>
+                <p className="text-sm font-mono text-text-primary mt-0.5">
                   {currentSupply.toLocaleString()}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-600">Contract BCH</p>
-                <p className="text-sm font-mono text-gray-300">
-                  {(contractState?.bchBalance ?? 0).toFixed(8)}
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Contract</p>
+                <p className="text-sm font-mono text-text-primary mt-0.5">
+                  {(contractState?.bchBalance ?? 0).toFixed(8)} BCH
                 </p>
               </div>
             </div>
           </div>
 
           {/* Token info */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <h2 className="text-sm font-semibold text-gray-400 mb-4">
+          <div className="glass-card p-5">
+            <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">
               Token Info
             </h2>
-            <div className="space-y-3">
-              {token.description && (
-                <p className="text-gray-300 text-sm">{token.description}</p>
-              )}
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-xs text-gray-600">Total Supply</p>
-                  <p className="font-mono text-gray-300">
-                    {token.totalSupply.toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600">Base Price</p>
-                  <p className="font-mono text-gray-300">
-                    {token.basePrice} sats
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600">Slope</p>
-                  <p className="font-mono text-gray-300">
-                    {token.slope} sats/token
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600">Category ID</p>
-                  <p className="font-mono text-gray-300 text-xs truncate">
-                    {token.categoryId}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600">Creator</p>
-                  <p className="font-mono text-gray-300 text-xs truncate">
-                    {token.creatorAddress}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600">Created</p>
-                  <p className="font-mono text-gray-300 text-xs">
-                    {new Date(token.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
+            {token.description && (
+              <p className="text-text-secondary text-sm mb-4 leading-relaxed">
+                {token.description}
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="bg-surface-1 rounded-lg p-3">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Supply</p>
+                <p className="font-mono text-text-primary text-xs mt-1">
+                  {token.totalSupply.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-surface-1 rounded-lg p-3">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Base Price</p>
+                <p className="font-mono text-text-primary text-xs mt-1">
+                  {token.basePrice} sats
+                </p>
+              </div>
+              <div className="bg-surface-1 rounded-lg p-3">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Slope</p>
+                <p className="font-mono text-text-primary text-xs mt-1">
+                  {token.slope} sats/token
+                </p>
+              </div>
+              <div className="bg-surface-1 rounded-lg p-3">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Created</p>
+                <p className="font-mono text-text-primary text-xs mt-1">
+                  {new Date(token.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="bg-surface-1 rounded-lg p-3 col-span-2">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Category ID</p>
+                <p className="font-mono text-text-primary text-xs mt-1 truncate">
+                  {token.categoryId}
+                </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right: Buy/Sell panels */}
-        <div className="space-y-6">
-          <BuyPanel
-            basePrice={token.basePrice}
-            slope={token.slope}
-            currentSupply={currentSupply}
-            categoryId={token.categoryId}
-            onBuy={() => setRefreshKey((k) => k + 1)}
-          />
-          <SellPanel
-            basePrice={token.basePrice}
-            slope={token.slope}
-            currentSupply={currentSupply}
-            categoryId={token.categoryId}
-            onSell={() => setRefreshKey((k) => k + 1)}
-          />
+        {/* Right: Swap card (2 cols) — Uniswap-style */}
+        <div className="lg:col-span-2">
+          <div className="glass-card p-5 lg:sticky lg:top-24">
+            {/* Buy/Sell tabs */}
+            <div className="flex bg-surface-1 rounded-xl p-1 mb-5 gap-0.5">
+              <button
+                onClick={() => setTab("buy")}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  tab === "buy"
+                    ? "bg-brand/15 text-brand"
+                    : "text-text-muted hover:text-text-secondary"
+                }`}
+              >
+                Buy
+              </button>
+              <button
+                onClick={() => setTab("sell")}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  tab === "sell"
+                    ? "bg-red-500/15 text-red-400"
+                    : "text-text-muted hover:text-text-secondary"
+                }`}
+              >
+                Sell
+              </button>
+            </div>
+
+            {tab === "buy" ? (
+              <BuyPanel
+                basePrice={token.basePrice}
+                slope={token.slope}
+                currentSupply={currentSupply}
+                categoryId={token.categoryId}
+                onBuy={() => setRefreshKey((k) => k + 1)}
+              />
+            ) : (
+              <SellPanel
+                basePrice={token.basePrice}
+                slope={token.slope}
+                currentSupply={currentSupply}
+                categoryId={token.categoryId}
+                onSell={() => setRefreshKey((k) => k + 1)}
+              />
+            )}
+
+            {/* Price info below swap */}
+            <div className="mt-5 pt-4 border-t border-border">
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-text-muted">Current Price</span>
+                <span className="text-text-primary font-mono">{currentPrice.toLocaleString()} sats</span>
+              </div>
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-text-muted">Base Price</span>
+                <span className="text-text-primary font-mono">{token.basePrice} sats</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-text-muted">Slope</span>
+                <span className="text-text-primary font-mono">{token.slope} sats/token</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
