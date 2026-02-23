@@ -1,0 +1,48 @@
+pragma cashscript ^0.12.0;
+
+// CashLaunch Bonding Curve Covenant
+// Holds CashTokens + BCH. Enforces linear pricing: price(n) = basePrice + n * slope
+// All math is integer-only (sats and token units).
+
+contract BondingCurve(bytes20 creatorPkh, int basePrice, int slope) {
+
+    // Buy tokens from the contract.
+    // Buyer sends BCH, receives tokens. Contract preserves itself (covenant).
+    function buy() {
+        // COVENANT: output must preserve the contract's locking bytecode
+        require(tx.outputs[this.activeInputIndex].lockingBytecode ==
+                tx.inputs[this.activeInputIndex].lockingBytecode);
+
+        // Same token category must be preserved
+        require(tx.outputs[this.activeInputIndex].tokenCategory ==
+                tx.inputs[this.activeInputIndex].tokenCategory);
+
+        // Calculate how many tokens the buyer is taking
+        int tokensBought = tx.inputs[this.activeInputIndex].tokenAmount
+                         - tx.outputs[this.activeInputIndex].tokenAmount;
+        require(tokensBought > 0);
+
+        // Calculate BCH added to the contract
+        int bchAdded = tx.outputs[this.activeInputIndex].value
+                     - tx.inputs[this.activeInputIndex].value;
+
+        // Current supply held by contract (before sale)
+        int currentSupply = tx.inputs[this.activeInputIndex].tokenAmount;
+
+        // Linear bonding curve cost calculation (integer math):
+        // Average price = basePrice + slope * (currentSupply - tokensBought/2)
+        // Total cost = tokensBought * averagePrice
+        // To avoid truncation issues, multiply first then divide:
+        // cost = tokensBought * basePrice + slope * tokensBought * (2 * currentSupply - tokensBought) / 2
+        int cost = tokensBought * basePrice
+                 + slope * tokensBought * (2 * currentSupply - tokensBought) / 2;
+
+        require(bchAdded >= cost);
+    }
+
+    // Creator can withdraw all funds + remaining tokens
+    function withdraw(pubkey pk, sig s) {
+        require(hash160(pk) == creatorPkh);
+        require(checkSig(s, pk));
+    }
+}

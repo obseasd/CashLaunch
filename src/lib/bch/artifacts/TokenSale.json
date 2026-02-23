@@ -1,0 +1,70 @@
+{
+  "contractName": "TokenSale",
+  "constructorInputs": [
+    {
+      "name": "creatorPkh",
+      "type": "bytes20"
+    },
+    {
+      "name": "pricePerToken",
+      "type": "int"
+    }
+  ],
+  "abi": [
+    {
+      "name": "buy",
+      "inputs": []
+    },
+    {
+      "name": "withdraw",
+      "inputs": [
+        {
+          "name": "pk",
+          "type": "pubkey"
+        },
+        {
+          "name": "s",
+          "type": "sig"
+        }
+      ]
+    }
+  ],
+  "bytecode": "OP_2 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_OUTPUTBYTECODE OP_INPUTINDEX OP_UTXOBYTECODE OP_EQUALVERIFY OP_INPUTINDEX OP_OUTPUTTOKENCATEGORY OP_INPUTINDEX OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_INPUTINDEX OP_UTXOTOKENAMOUNT OP_INPUTINDEX OP_OUTPUTTOKENAMOUNT OP_SUB OP_DUP OP_0 OP_GREATERTHAN OP_VERIFY OP_INPUTINDEX OP_OUTPUTVALUE OP_INPUTINDEX OP_UTXOVALUE OP_SUB OP_SWAP OP_3 OP_ROLL OP_MUL OP_GREATERTHANOREQUAL OP_NIP OP_NIP OP_ELSE OP_ROT OP_1 OP_NUMEQUALVERIFY OP_2 OP_PICK OP_HASH160 OP_EQUALVERIFY OP_ROT OP_ROT OP_CHECKSIG OP_NIP OP_ENDIF",
+  "source": "pragma cashscript ^0.12.0;\n\n// CashLaunch Fixed-Price Token Sale (fallback contract)\n// Simpler alternative: each token costs a fixed pricePerToken in sats.\n\ncontract TokenSale(bytes20 creatorPkh, int pricePerToken) {\n\n    // Buy tokens at fixed price\n    function buy() {\n        // COVENANT: preserve contract on output\n        require(tx.outputs[this.activeInputIndex].lockingBytecode ==\n                tx.inputs[this.activeInputIndex].lockingBytecode);\n\n        // Same token category preserved\n        require(tx.outputs[this.activeInputIndex].tokenCategory ==\n                tx.inputs[this.activeInputIndex].tokenCategory);\n\n        // Calculate tokens bought\n        int tokensBought = tx.inputs[this.activeInputIndex].tokenAmount\n                         - tx.outputs[this.activeInputIndex].tokenAmount;\n        require(tokensBought > 0);\n\n        // Calculate BCH added\n        int bchAdded = tx.outputs[this.activeInputIndex].value\n                     - tx.inputs[this.activeInputIndex].value;\n\n        // Fixed price check\n        require(bchAdded >= tokensBought * pricePerToken);\n    }\n\n    // Creator can withdraw all funds + remaining tokens\n    function withdraw(pubkey pk, sig s) {\n        require(hash160(pk) == creatorPkh);\n        require(checkSig(s, pk));\n    }\n}\n",
+  "debug": {
+    "bytecode": "5279009c63c0cdc0c788c0d1c0ce88c0d0c0d3947600a069c0ccc0c6947c537a95a27777677b519d5279a9887b7bac7768",
+    "sourceMap": "9:4:29:5;;;;;11:27:11:48;:16::65:1;12:26:12:47:0;:16::64:1;11:8::66;15:27:15:48:0;:16::63:1;16:26:16:47:0;:16::62:1;15:8::64;19:37:19:58:0;:27::71:1;20:38:20:59:0;:27::72:1;19;21:16:21:28:0;:31::32;:16:::1;:8::34;24:34:24:55:0;:23::62:1;25:33:25:54:0;:23::61:1;24;28:28:28:40:0;:43::56;;:28:::1;:8::58;9:4:29:5;;;32::35::0;;;33:24:33:26;;:16::27:1;:8::43;34:25:34:26:0;:28::30;:8::33:1;32:4:35:5;6:0:36:1",
+    "logs": [],
+    "requires": [
+      {
+        "ip": 11,
+        "line": 11
+      },
+      {
+        "ip": 16,
+        "line": 15
+      },
+      {
+        "ip": 25,
+        "line": 21
+      },
+      {
+        "ip": 36,
+        "line": 28
+      },
+      {
+        "ip": 45,
+        "line": 33
+      },
+      {
+        "ip": 49,
+        "line": 34
+      }
+    ]
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.12.1"
+  },
+  "updatedAt": "2026-02-23T14:08:31.983Z"
+}

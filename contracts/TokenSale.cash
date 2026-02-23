@@ -1,0 +1,36 @@
+pragma cashscript ^0.12.0;
+
+// CashLaunch Fixed-Price Token Sale (fallback contract)
+// Simpler alternative: each token costs a fixed pricePerToken in sats.
+
+contract TokenSale(bytes20 creatorPkh, int pricePerToken) {
+
+    // Buy tokens at fixed price
+    function buy() {
+        // COVENANT: preserve contract on output
+        require(tx.outputs[this.activeInputIndex].lockingBytecode ==
+                tx.inputs[this.activeInputIndex].lockingBytecode);
+
+        // Same token category preserved
+        require(tx.outputs[this.activeInputIndex].tokenCategory ==
+                tx.inputs[this.activeInputIndex].tokenCategory);
+
+        // Calculate tokens bought
+        int tokensBought = tx.inputs[this.activeInputIndex].tokenAmount
+                         - tx.outputs[this.activeInputIndex].tokenAmount;
+        require(tokensBought > 0);
+
+        // Calculate BCH added
+        int bchAdded = tx.outputs[this.activeInputIndex].value
+                     - tx.inputs[this.activeInputIndex].value;
+
+        // Fixed price check
+        require(bchAdded >= tokensBought * pricePerToken);
+    }
+
+    // Creator can withdraw all funds + remaining tokens
+    function withdraw(pubkey pk, sig s) {
+        require(hash160(pk) == creatorPkh);
+        require(checkSig(s, pk));
+    }
+}
