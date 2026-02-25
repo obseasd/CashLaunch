@@ -5,9 +5,10 @@ import { TestNetWallet, TokenSendRequest, DefaultProvider } from "mainnet-js";
 DefaultProvider.servers.testnet = [
   "wss://chipnet.imaginary.cash:50004",
   "wss://chipnet.bch.ninja:50004",
+  "wss://cbch.loping.net:64004",
 ];
 
-export const maxDuration = 60; // Vercel serverless timeout
+export const maxDuration = 120; // Vercel serverless timeout (2 min)
 
 export async function POST(req: NextRequest) {
   try {

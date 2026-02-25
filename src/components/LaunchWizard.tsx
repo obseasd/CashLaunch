@@ -47,7 +47,7 @@ export default function LaunchWizard() {
     setError("");
 
     try {
-      // Compute contract address client-side first
+      // Compute contract address client-side first (no network needed)
       const { Contract, ElectrumNetworkProvider } = await import("cashscript");
       const artifact = (await import("@/lib/bch/artifacts/BondingCurve.json")).default;
 
@@ -59,24 +59,35 @@ export default function LaunchWizard() {
       );
 
       // Single API call: genesis + wait + fund contract
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 55000);
+      // Retry up to 2 times if chipnet is slow
+      let launchRes: Response | null = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 120000); // 2 min timeout
 
-      const launchRes = await fetch("/api/token/launch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mnemonic: wallet.mnemonic,
-          supply: CURVE.totalSupply,
-          contractTokenAddress: contract.tokenAddress,
-        }),
-        signal: controller.signal,
-      });
+        try {
+          launchRes = await fetch("/api/token/launch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mnemonic: wallet.mnemonic,
+              supply: CURVE.totalSupply,
+              contractTokenAddress: contract.tokenAddress,
+            }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+          break; // success, exit retry loop
+        } catch (fetchErr) {
+          clearTimeout(timeout);
+          if (attempt === 1) throw fetchErr; // last attempt, rethrow
+          // First attempt failed, wait and retry
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+      }
 
-      clearTimeout(timeout);
-
-      if (!launchRes.ok) {
-        const errData = await launchRes.json();
+      if (!launchRes || !launchRes.ok) {
+        const errData = launchRes ? await launchRes.json() : { error: "Network error" };
         throw new Error(errData.error || "Token launch failed");
       }
 
@@ -99,7 +110,7 @@ export default function LaunchWizard() {
       setStep(3);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
-        setError("Request timed out — chipnet indexer may be slow. Try again.");
+        setError("Request timed out — chipnet servers are slow. Click Launch Token to retry.");
       } else {
         setError(err instanceof Error ? err.message : "Launch failed");
       }
