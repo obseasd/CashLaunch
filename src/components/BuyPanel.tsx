@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWallet } from "@/context/WalletContext";
 
 interface Props {
@@ -26,6 +26,27 @@ export default function BuyPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [txId, setTxId] = useState("");
+  const [userBalance, setUserBalance] = useState<number | null>(null);
+
+  // Fetch user's BCH balance
+  useEffect(() => {
+    if (!wallet) { setUserBalance(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { ElectrumNetworkProvider } = await import("cashscript");
+        const provider = new ElectrumNetworkProvider("chipnet");
+        const utxos = await provider.getUtxos(wallet.address);
+        const total = utxos
+          .filter((u) => !u.token)
+          .reduce((sum, u) => sum + Number(u.satoshis), 0);
+        if (!cancelled) setUserBalance(total);
+      } catch {
+        if (!cancelled) setUserBalance(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [wallet, txId]); // re-fetch after a successful buy
 
   const tokenAmount = parseInt(amount) || 0;
 
@@ -37,6 +58,21 @@ export default function BuyPanel({
         (slope * tokenAmount * (2 * sold + tokenAmount)) / 2
       : 0;
   const costBch = cost / 1e8;
+
+  // Calculate max tokens affordable with user's balance
+  // Quadratic: slope/2 * n² + (basePrice + slope*sold) * n = budget
+  // n = (-b + sqrt(b² + 2*slope*budget)) / slope
+  const maxAffordable = (() => {
+    if (userBalance === null || userBalance <= 2000) return 0;
+    const budget = userBalance - 2000; // reserve for fees + dust
+    if (slope === 0) {
+      return basePrice > 0 ? Math.floor(budget / basePrice) : currentSupply;
+    }
+    const b = basePrice + slope * sold;
+    const disc = b * b + 2 * slope * budget;
+    const n = Math.floor((-b + Math.sqrt(disc)) / slope);
+    return Math.max(0, Math.min(n, currentSupply));
+  })();
 
   const handleBuy = async () => {
     if (!wallet || tokenAmount <= 0) return;
@@ -133,7 +169,9 @@ export default function BuyPanel({
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-text-muted">Amount</span>
           <span className="text-[11px] text-text-muted">
-            Available: {currentSupply.toLocaleString()}
+            {userBalance !== null
+              ? `You can buy: ~${maxAffordable.toLocaleString()}`
+              : `In contract: ${currentSupply.toLocaleString()}`}
           </span>
         </div>
         <input
@@ -146,18 +184,23 @@ export default function BuyPanel({
           className="w-full bg-transparent text-2xl font-mono text-text-primary placeholder:text-text-muted/40 focus:outline-none"
         />
         <div className="flex gap-1.5 mt-3">
-          {[100, 1000, 10000].map((q) => (
-            <button
-              key={q}
-              onClick={() => setAmount(String(Math.min(q, currentSupply)))}
-              className="bg-surface-2 border border-border rounded-lg px-2.5 py-1 text-[11px] text-text-muted hover:text-text-secondary hover:border-border-hover transition-all duration-200"
-            >
-              {q.toLocaleString()}
-            </button>
-          ))}
+          {[100, 1000, 10000].map((q) => {
+            const cap = userBalance !== null ? Math.min(q, maxAffordable) : Math.min(q, currentSupply);
+            return (
+              <button
+                key={q}
+                onClick={() => setAmount(String(cap))}
+                disabled={cap <= 0}
+                className="bg-surface-2 border border-border rounded-lg px-2.5 py-1 text-[11px] text-text-muted hover:text-text-secondary hover:border-border-hover transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                {q.toLocaleString()}
+              </button>
+            );
+          })}
           <button
-            onClick={() => setAmount(String(currentSupply))}
-            className="bg-brand/10 border border-brand/20 rounded-lg px-2.5 py-1 text-[11px] text-brand hover:bg-brand/15 transition-all duration-200"
+            onClick={() => setAmount(String(userBalance !== null ? maxAffordable : currentSupply))}
+            disabled={userBalance !== null && maxAffordable <= 0}
+            className="bg-brand/10 border border-brand/20 rounded-lg px-2.5 py-1 text-[11px] text-brand hover:bg-brand/15 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
           >
             MAX
           </button>
@@ -176,6 +219,11 @@ export default function BuyPanel({
         {tokenAmount > 0 && (
           <p className="text-[11px] text-text-muted mt-1">
             {cost.toLocaleString()} sats &middot; {(cost / tokenAmount).toFixed(1)} sats/token avg
+          </p>
+        )}
+        {userBalance !== null && (
+          <p className="text-[11px] text-text-muted mt-1">
+            Balance: {userBalance.toLocaleString()} sats
           </p>
         )}
       </div>

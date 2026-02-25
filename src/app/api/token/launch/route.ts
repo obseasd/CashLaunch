@@ -56,14 +56,30 @@ export async function POST(req: NextRequest) {
     await new Promise((r) => setTimeout(r, 3000));
 
     // Step 4: Send all tokens to the bonding curve contract
+    // Use getTokenBalance() to get the exact amount instead of relying on
+    // the supply param — mainnet-js may split tokens across UTXOs during genesis.
+    const tokenBalance = await wallet.getTokenBalance(categoryId);
     const fundResult = await wallet.send([
       new TokenSendRequest({
         cashaddr: contractTokenAddress,
-        amount: BigInt(supply),
+        amount: tokenBalance,
         category: categoryId,
       }),
     ]);
     const fundTxId = fundResult.txId!;
+
+    // Step 5: Verify no tokens remain in the wallet (cleanup if needed)
+    await new Promise((r) => setTimeout(r, 2000));
+    const remaining = await wallet.getTokenBalance(categoryId);
+    if (remaining > 0n) {
+      await wallet.send([
+        new TokenSendRequest({
+          cashaddr: contractTokenAddress,
+          amount: remaining,
+          category: categoryId,
+        }),
+      ]);
+    }
 
     return NextResponse.json({
       categoryId,
