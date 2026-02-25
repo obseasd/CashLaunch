@@ -7,10 +7,10 @@
 export const CURVE = {
   totalSupply: 10_000,        // 10K tokens
   basePrice: 100,             // 100 sats starting price
-  slope: 1,                   // +1 sat per token sold
+  slope: 2,                   // +2 sats per token sold
   // Start price: 100 sats
-  // End price:   10,100 sats
-  // Total to bond: ~51M sats (~0.51 BCH)
+  // End price:   20,100 sats
+  // Total to bond: ~101M sats (~1.01 BCH)
 } as const;
 
 export interface LaunchedToken {
