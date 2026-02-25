@@ -41,34 +41,25 @@ export default function LaunchWizard() {
   const hue = symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   const hue2 = (hue + 40) % 360;
 
-  // Helper: fetch API with timeout + non-JSON error handling
-  const fetchAPI = async (url: string, body: Record<string, unknown>) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 55000);
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    const text = await res.text();
-    let data;
-    try { data = JSON.parse(text); } catch { throw new Error(`Server error: ${text.slice(0, 120)}`); }
-    if (!res.ok) throw new Error(data.error || "API error");
-    return data;
-  };
-
   const handleLaunch = async () => {
     if (!wallet) return;
     setLoading(true);
     setError("");
 
     try {
-      // Compute contract address client-side first (no network needed)
+      // All operations run client-side (browser) to avoid Vercel serverless timeout
       const { Contract, ElectrumNetworkProvider } = await import("cashscript");
       const artifact = (await import("@/lib/bch/artifacts/BondingCurve.json")).default;
+      const mainnetJs = await import("mainnet-js");
+      const { TestNetWallet, TokenSendRequest } = mainnetJs;
 
+      // Configure chipnet servers
+      mainnetJs.DefaultProvider.servers.testnet = [
+        "wss://chipnet.imaginary.cash:50004",
+        "wss://chipnet.bch.ninja:50004",
+      ];
+
+      // Compute contract address
       const provider = new ElectrumNetworkProvider("chipnet");
       const contract = new Contract(
         artifact,
@@ -76,33 +67,52 @@ export default function LaunchWizard() {
         { provider }
       );
 
-      // --- STEP 1: Token Genesis ---
-      const genesisRes = await fetchAPI("/api/token/launch", {
-        mnemonic: wallet.mnemonic,
-        supply: CURVE.totalSupply,
-        step: "genesis",
-      });
-      const { categoryId, genesisTxId } = genesisRes;
+      // Create mainnet-js wallet for genesis
+      const mnWallet = await TestNetWallet.fromSeed(wallet.mnemonic);
 
-      // Wait for genesis to propagate (client-side, doesn't count against Vercel timeout)
+      // Check balance
+      const balance = await mnWallet.getBalance();
+      if (!balance) throw new Error(`Wallet has no tBCH. Fund from tbch.googol.cash`);
+
+      // Consolidate UTXOs if needed
+      const utxos = await mnWallet.getUtxos();
+      const bchUtxos = utxos.filter((u: { token?: unknown }) => !u.token);
+      if (bchUtxos.length > 1) {
+        try {
+          await mnWallet.sendMax(mnWallet.cashaddr!);
+          await new Promise((r) => setTimeout(r, 2000));
+        } catch { /* continue */ }
+      }
+
+      // --- STEP 1: Token Genesis ---
+      const genesisResult = await mnWallet.tokenGenesis({
+        cashaddr: mnWallet.tokenaddr!,
+        amount: BigInt(CURVE.totalSupply),
+      });
+      const categoryId = genesisResult.categories![0];
+      const genesisTxId = genesisResult.txId!;
+
+      // Wait for genesis to propagate
       await new Promise((r) => setTimeout(r, 3000));
 
-      // --- STEP 2: Fund Contract (send tokens) ---
-      // Retry up to 3 times — mempool propagation can be slow
+      // --- STEP 2: Send all tokens to bonding curve contract ---
+      // Retry up to 3 times for mempool propagation
       let funded = false;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          await fetchAPI("/api/token/launch", {
-            mnemonic: wallet.mnemonic,
-            step: "fund",
-            categoryId,
-            contractTokenAddress: contract.tokenAddress,
-          });
+          const tokenBalance = await mnWallet.getTokenBalance(categoryId);
+          if (tokenBalance <= 0n) throw new Error("Tokens not yet visible");
+          await mnWallet.send([
+            new TokenSendRequest({
+              cashaddr: contract.tokenAddress,
+              amount: tokenBalance,
+              category: categoryId,
+            }),
+          ]);
           funded = true;
           break;
         } catch (e) {
           if (attempt === 2) throw e;
-          // Wait longer between retries for propagation
           await new Promise((r) => setTimeout(r, 3000));
         }
       }
