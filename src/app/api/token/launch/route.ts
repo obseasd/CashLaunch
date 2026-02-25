@@ -8,7 +8,7 @@ DefaultProvider.servers.testnet = [
   "wss://cbch.loping.net:64004",
 ];
 
-export const maxDuration = 120; // Vercel serverless timeout (2 min)
+export const maxDuration = 60; // Vercel Hobby plan max
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     // Step 1: Consolidate UTXOs — token genesis requires a UTXO at vout=0
     try {
       await wallet.sendMax(wallet.cashaddr!);
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 1500));
     } catch {
       // May fail if already consolidated, continue
     }
@@ -48,17 +48,13 @@ export async function POST(req: NextRequest) {
       amount: BigInt(supply),
     });
 
-    // In CashTokens, the category ID is the txid of the consumed vout=0 UTXO,
-    // NOT the genesis transaction itself. mainnet-js returns it in categories[0].
     const categoryId = genesisResult.categories![0];
     const genesisTxId = genesisResult.txId!;
 
     // Step 3: Wait for genesis tx to propagate in mempool
-    await new Promise((r) => setTimeout(r, 3000));
+    await new Promise((r) => setTimeout(r, 2000));
 
     // Step 4: Send all tokens to the bonding curve contract
-    // Use getTokenBalance() to get the exact amount instead of relying on
-    // the supply param — mainnet-js may split tokens across UTXOs during genesis.
     const tokenBalance = await wallet.getTokenBalance(categoryId);
     const fundResult = await wallet.send([
       new TokenSendRequest({
@@ -68,19 +64,6 @@ export async function POST(req: NextRequest) {
       }),
     ]);
     const fundTxId = fundResult.txId!;
-
-    // Step 5: Verify no tokens remain in the wallet (cleanup if needed)
-    await new Promise((r) => setTimeout(r, 2000));
-    const remaining = await wallet.getTokenBalance(categoryId);
-    if (remaining > 0n) {
-      await wallet.send([
-        new TokenSendRequest({
-          cashaddr: contractTokenAddress,
-          amount: remaining,
-          category: categoryId,
-        }),
-      ]);
-    }
 
     return NextResponse.json({
       categoryId,

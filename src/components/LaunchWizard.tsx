@@ -86,12 +86,21 @@ export default function LaunchWizard() {
         }
       }
 
-      if (!launchRes || !launchRes.ok) {
-        const errData = launchRes ? await launchRes.json() : { error: "Network error" };
-        throw new Error(errData.error || "Token launch failed");
+      if (!launchRes) throw new Error("Network error");
+
+      const responseText = await launchRes.text();
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Server error: ${responseText.slice(0, 100)}`);
       }
 
-      const { categoryId, genesisTxId } = await launchRes.json();
+      if (!launchRes.ok) {
+        throw new Error(responseData.error || "Token launch failed");
+      }
+
+      const { categoryId, genesisTxId } = responseData;
 
       saveToken({
         categoryId,
