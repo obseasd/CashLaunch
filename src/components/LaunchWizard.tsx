@@ -41,6 +41,24 @@ export default function LaunchWizard() {
   const hue = symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   const hue2 = (hue + 40) % 360;
 
+  // Helper: fetch API with timeout + non-JSON error handling
+  const fetchAPI = async (url: string, body: Record<string, unknown>) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55000);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error(`Server error: ${text.slice(0, 120)}`); }
+    if (!res.ok) throw new Error(data.error || "API error");
+    return data;
+  };
+
   const handleLaunch = async () => {
     if (!wallet) return;
     setLoading(true);
@@ -58,49 +76,37 @@ export default function LaunchWizard() {
         { provider }
       );
 
-      // Single API call: genesis + wait + fund contract
-      // Retry up to 2 times if chipnet is slow
-      let launchRes: Response | null = null;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 120000); // 2 min timeout
+      // --- STEP 1: Token Genesis ---
+      const genesisRes = await fetchAPI("/api/token/launch", {
+        mnemonic: wallet.mnemonic,
+        supply: CURVE.totalSupply,
+        step: "genesis",
+      });
+      const { categoryId, genesisTxId } = genesisRes;
 
+      // Wait for genesis to propagate (client-side, doesn't count against Vercel timeout)
+      await new Promise((r) => setTimeout(r, 3000));
+
+      // --- STEP 2: Fund Contract (send tokens) ---
+      // Retry up to 3 times — mempool propagation can be slow
+      let funded = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          launchRes = await fetch("/api/token/launch", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              mnemonic: wallet.mnemonic,
-              supply: CURVE.totalSupply,
-              contractTokenAddress: contract.tokenAddress,
-            }),
-            signal: controller.signal,
+          await fetchAPI("/api/token/launch", {
+            mnemonic: wallet.mnemonic,
+            step: "fund",
+            categoryId,
+            contractTokenAddress: contract.tokenAddress,
           });
-          clearTimeout(timeout);
-          break; // success, exit retry loop
-        } catch (fetchErr) {
-          clearTimeout(timeout);
-          if (attempt === 1) throw fetchErr; // last attempt, rethrow
-          // First attempt failed, wait and retry
+          funded = true;
+          break;
+        } catch (e) {
+          if (attempt === 2) throw e;
+          // Wait longer between retries for propagation
           await new Promise((r) => setTimeout(r, 3000));
         }
       }
-
-      if (!launchRes) throw new Error("Network error");
-
-      const responseText = await launchRes.text();
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-      } catch {
-        throw new Error(`Server error: ${responseText.slice(0, 100)}`);
-      }
-
-      if (!launchRes.ok) {
-        throw new Error(responseData.error || "Token launch failed");
-      }
-
-      const { categoryId, genesisTxId } = responseData;
+      if (!funded) throw new Error("Failed to fund contract after retries");
 
       saveToken({
         categoryId,
