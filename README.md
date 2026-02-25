@@ -1,8 +1,16 @@
 # CashLaunch
 
-**CashTokens Launchpad on Bitcoin Cash** — Create a CashToken with instant bonding curve liquidity. No DEX listing needed. All trades on-chain.
+**The CashTokens Launchpad for Bitcoin Cash** — Anyone can create a CashToken and launch it with instant liquidity through an automated bonding curve. No DEX listing required, no seed capital needed. All trades are trustless, non-custodial, and verifiable on-chain.
 
 Built for the **BCH-1 Hackcelerator Hackathon** — Cashtokens Systems track.
+
+## The Problem
+
+CashTokens lack easy liquidity bootstrapping. Creators must manually list on DEXs, find market makers, and bootstrap trading — a slow, fragmented process that discourages new token launches on Bitcoin Cash.
+
+## The Solution
+
+CashLaunch solves this by letting anyone launch a CashToken with **instant bonding curve liquidity** in a single click. No DEX listing, no market maker, no seed capital. The bonding curve contract — a CashScript covenant deployed on-chain — automatically handles pricing, buys, and sells.
 
 ## How It Works
 
@@ -10,14 +18,27 @@ Built for the **BCH-1 Hackcelerator Hackathon** — Cashtokens Systems track.
 Creator fills form ──► Token minted (CashTokens) ──► Deposited into CashScript covenant
                                                           │
 Buyer sends BCH ──► Contract enforces bonding curve ──► Buyer receives tokens
-                         price = basePrice + slope × supply
+                         price = basePrice + slope × tokensSold
 ```
 
-1. **Launch** — Creator sets name, symbol, supply, and curve parameters. Token is minted via `mainnet-js` and deposited into a CashScript bonding curve covenant.
-2. **Buy** — Anyone sends BCH to the contract. The covenant enforces the pricing formula and sends tokens to the buyer. Price increases as supply decreases.
-3. **Sell** — Reverse the process. Send tokens back, receive BCH at the current curve price.
+1. **Launch** — Creator configures token parameters (name, symbol, logo) and launches with one click. Tokens are minted via CashToken genesis and deposited into a CashScript bonding curve covenant.
+2. **Buy** — Anyone sends BCH to the covenant contract. The contract enforces the pricing formula on-chain and sends tokens to the buyer. Price increases as more tokens are sold.
+3. **Sell** — Holders send tokens back to the contract and receive BCH at the current curve price. Price decreases accordingly.
+4. **Bond** — When the bonding curve reaches 100% (~1 BCH total volume), the token is fully bonded. The creator can withdraw accumulated BCH.
 
 All trades happen on-chain via Bitcoin Script — no backend, no orderbook, no centralized exchange.
+
+## Status & Roadmap
+
+CashLaunch is a **working prototype** deployed on BCH Chipnet (testnet). We are actively working on:
+
+- **User experience** — Smoother onboarding, wallet integration (Cashonize, Paytaca), and mobile-friendly UI
+- **Reliability** — Faster transaction confirmation, better error handling, multi-server Electrum failover
+- **Features** — Trade history, token metadata (BCMR), social sharing, creator dashboard, portfolio tracking
+- **Mainnet readiness** — Security audit of the bonding curve covenant, gas optimization, production wallet connect
+- **DEX graduation** — Automatic liquidity migration to a BCH DEX when bonding curve reaches 100%
+
+The goal is to make CashLaunch the easiest way to launch and trade tokens on Bitcoin Cash — ready for real users and real BCH.
 
 ## Architecture
 
@@ -147,6 +168,12 @@ All operations run on **BCH Chipnet** (testnet). No real funds are used.
 - Electrum: `ElectrumNetworkProvider('chipnet')`
 - Faucet: https://tbch4.googol.cash/
 
+## Live Demo
+
+**Chipnet (testnet):** [cashlaunch.vercel.app](https://cashlaunch.vercel.app)
+
+To test: Connect Wallet → Fund from [faucet](https://tbch.googol.cash/) → Launch a Token → Buy & Sell
+
 ---
 
-Built for **BCH-1 Hackcelerator** — Cashtokens Systems track
+Built with care for **BCH-1 Hackcelerator** — Cashtokens Systems track
