@@ -47,6 +47,9 @@ export default function LaunchWizard() {
     setError("");
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000);
+
       const genesisRes = await fetch("/api/token/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -54,7 +57,10 @@ export default function LaunchWizard() {
           mnemonic: wallet.mnemonic,
           supply: CURVE.totalSupply,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeout);
 
       if (!genesisRes.ok) {
         const errData = await genesisRes.json();
@@ -73,6 +79,9 @@ export default function LaunchWizard() {
         { provider }
       );
 
+      const controller2 = new AbortController();
+      const timeout2 = setTimeout(() => controller2.abort(), 45000);
+
       const fundRes = await fetch("/api/token/fund-contract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -82,7 +91,10 @@ export default function LaunchWizard() {
           contractTokenAddress: contract.tokenAddress,
           amount: CURVE.totalSupply,
         }),
+        signal: controller2.signal,
       });
+
+      clearTimeout(timeout2);
 
       if (!fundRes.ok) {
         const errData = await fundRes.json();
@@ -105,7 +117,11 @@ export default function LaunchWizard() {
       setResult({ categoryId, txId });
       setStep(3);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Launch failed");
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("Request timed out — chipnet indexer may be slow. Try again.");
+      } else {
+        setError(err instanceof Error ? err.message : "Launch failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -358,6 +374,25 @@ export default function LaunchWizard() {
           {error && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
               <p className="text-red-400 text-sm break-all">{error}</p>
+            </div>
+          )}
+
+          {/* Funding hint */}
+          {isConnected && wallet && (
+            <div className="p-3 bg-surface-1 rounded-xl">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Your chipnet address</p>
+              <p className="text-xs font-mono text-text-secondary break-all">{wallet.address}</p>
+              <p className="text-[11px] text-text-muted mt-2">
+                Need tBCH? Get some from{" "}
+                <a
+                  href="https://tbch.googol.cash/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand hover:text-brand-light"
+                >
+                  tbch.googol.cash
+                </a>
+              </p>
             </div>
           )}
 

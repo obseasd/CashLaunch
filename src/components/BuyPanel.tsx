@@ -15,9 +15,10 @@ export default function BuyPanel({
   basePrice,
   slope,
   currentSupply,
-  categoryId: _categoryId,
+  categoryId,
   onBuy,
 }: Props) {
+  const isDemo = categoryId.startsWith("demo-");
   const { wallet, isConnected } = useWallet();
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
@@ -150,7 +151,19 @@ export default function BuyPanel({
       </div>
 
       {/* Buy button */}
-      {!isConnected ? (
+      {isDemo ? (
+        <div className="text-center">
+          <button
+            disabled
+            className="w-full bg-surface-2 text-text-muted font-semibold py-3.5 rounded-xl cursor-not-allowed text-sm"
+          >
+            Demo token
+          </button>
+          <p className="text-[11px] text-text-muted mt-2">
+            Launch your own token to trade on-chain
+          </p>
+        </div>
+      ) : !isConnected ? (
         <button
           disabled
           className="w-full bg-surface-2 text-text-muted font-semibold py-3.5 rounded-xl cursor-not-allowed text-sm"
