@@ -74,15 +74,12 @@ export default function LaunchWizard() {
       const balance = await mnWallet.getBalance();
       if (!balance) throw new Error(`Wallet has no tBCH. Fund from tbch.googol.cash`);
 
-      // Consolidate UTXOs if needed
-      const utxos = await mnWallet.getUtxos();
-      const bchUtxos = utxos.filter((u: { token?: unknown }) => !u.token);
-      if (bchUtxos.length > 1) {
-        try {
-          await mnWallet.sendMax(mnWallet.cashaddr!);
-          await new Promise((r) => setTimeout(r, 2000));
-        } catch { /* continue */ }
-      }
+      // Always consolidate — genesis requires a UTXO at vout=0
+      // Even a single UTXO might be at vout=1 (change output)
+      try {
+        await mnWallet.sendMax(mnWallet.cashaddr!);
+        await new Promise((r) => setTimeout(r, 2000));
+      } catch { /* may fail if only dust, continue */ }
 
       // --- STEP 1: Token Genesis ---
       const genesisResult = await mnWallet.tokenGenesis({
