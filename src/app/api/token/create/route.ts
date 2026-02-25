@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TestNetWallet } from "mainnet-js";
+import { TestNetWallet, DefaultProvider } from "mainnet-js";
+
+// Configure chipnet Electrum servers (multiple for redundancy)
+DefaultProvider.servers.testnet = [
+  "wss://chipnet.imaginary.cash:50004",
+  "wss://chipnet.bch.ninja:50004",
+];
+
+export const maxDuration = 60; // Vercel serverless timeout
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +26,7 @@ export async function POST(req: NextRequest) {
     if (!balance) {
       return NextResponse.json(
         {
-          error: `Wallet has no BCH. Fund it first: ${wallet.cashaddr}`,
+          error: `Wallet has no tBCH. Fund it from tbch.googol.cash — Address: ${wallet.cashaddr}`,
           address: wallet.cashaddr,
         },
         { status: 400 }
