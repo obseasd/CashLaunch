@@ -23,15 +23,23 @@ function timeAgo(ts: number): string {
 }
 
 export default function TokenCard({ token }: { token: LaunchedToken }) {
-  // Deterministic progress from categoryId hash
-  const hashCode = token.categoryId
-    .split("")
-    .reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0);
-  const progress = Math.abs(hashCode % 50) + 5; // 5-54% range, deterministic per token
+  const isDemo = token.categoryId.startsWith("demo-");
 
-  // Ascending bonding curve: price = basePrice + slope * tokensSold
-  const estimatedSold = Math.floor(token.totalSupply * (progress / 100));
-  const currentPrice = token.basePrice + token.slope * estimatedSold;
+  // For demo tokens: fake progress from hash. For real tokens: start at 0%
+  let progress: number;
+  let currentPrice: number;
+  if (isDemo) {
+    const hashCode = token.categoryId
+      .split("")
+      .reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0);
+    progress = Math.abs(hashCode % 50) + 5;
+    const estimatedSold = Math.floor(token.totalSupply * (progress / 100));
+    currentPrice = token.basePrice + token.slope * estimatedSold;
+  } else {
+    // Real token: starts at 0% sold, base price
+    progress = 0;
+    currentPrice = token.basePrice;
+  }
   const marketCapSats = currentPrice * token.totalSupply;
 
   // Deterministic gradient from symbol
