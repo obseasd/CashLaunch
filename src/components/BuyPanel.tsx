@@ -6,6 +6,7 @@ import { useWallet } from "@/context/WalletContext";
 interface Props {
   basePrice: number;
   slope: number;
+  totalSupply: number;
   currentSupply: number;
   categoryId: string;
   onBuy?: (amount: number, txId: string) => void;
@@ -14,6 +15,7 @@ interface Props {
 export default function BuyPanel({
   basePrice,
   slope,
+  totalSupply,
   currentSupply,
   categoryId,
   onBuy,
@@ -27,10 +29,12 @@ export default function BuyPanel({
 
   const tokenAmount = parseInt(amount) || 0;
 
+  // sold = tokens outside the contract
+  const sold = totalSupply - currentSupply;
   const cost =
     tokenAmount > 0
       ? tokenAmount * basePrice +
-        (slope * tokenAmount * (2 * currentSupply - tokenAmount)) / 2
+        (slope * tokenAmount * (2 * sold + tokenAmount)) / 2
       : 0;
   const costBch = cost / 1e8;
 
@@ -41,7 +45,7 @@ export default function BuyPanel({
     setTxId("");
 
     try {
-      const { ElectrumNetworkProvider, Contract, TransactionBuilder } =
+      const { ElectrumNetworkProvider, Contract, TransactionBuilder, SignatureTemplate } =
         await import("cashscript");
       const artifact = (await import("@/lib/bch/artifacts/BondingCurve.json"))
         .default;
@@ -49,26 +53,46 @@ export default function BuyPanel({
       const provider = new ElectrumNetworkProvider("chipnet");
       const contract = new Contract(
         artifact,
-        [wallet.pubkeyHash, BigInt(basePrice), BigInt(slope)],
+        [wallet.pubkeyHash, BigInt(basePrice), BigInt(slope), BigInt(totalSupply)],
         { provider }
       );
 
+      // Get contract's token UTXO
       const utxos = await contract.getUtxos();
       const tokenUtxo = utxos.find((u) => u.token);
       if (!tokenUtxo?.token)
         throw new Error("No tokens in contract");
 
+      // Get user's BCH UTXO to fund the purchase
+      const userUtxos = await provider.getUtxos(wallet.address);
+      const userUtxo = userUtxos
+        .filter((u) => !u.token)
+        .sort((a, b) => Number(b.satoshis - a.satoshis))[0];
+      if (!userUtxo)
+        throw new Error("No BCH in your wallet to fund the purchase");
+
       const buyAmount = BigInt(tokenAmount);
       const remaining = tokenUtxo.token.amount - buyAmount;
+      const soldBefore = BigInt(totalSupply) - tokenUtxo.token.amount;
       const buyCost =
         buyAmount * BigInt(basePrice) +
         (BigInt(slope) *
           buyAmount *
-          (2n * tokenUtxo.token.amount - buyAmount)) /
+          (2n * soldBefore + buyAmount)) /
           2n;
+
+      // Check user has enough BCH
+      const minNeeded = buyCost + 2000n; // cost + dust + fee
+      if (userUtxo.satoshis < minNeeded)
+        throw new Error(`Not enough BCH. Need ${Number(minNeeded)} sats, have ${Number(userUtxo.satoshis)}`);
+
+      const signer = new SignatureTemplate(wallet.privateKey);
+      const txFee = 1000n;
 
       const tx = new TransactionBuilder({ provider })
         .addInput(tokenUtxo, contract.unlock.buy())
+        .addInput(userUtxo, signer.unlockP2PKH())
+        // Contract output: fewer tokens, more BCH
         .addOutput({
           to: contract.tokenAddress,
           amount: tokenUtxo.satoshis + buyCost,
@@ -77,6 +101,7 @@ export default function BuyPanel({
             category: tokenUtxo.token.category,
           },
         })
+        // User receives bought tokens
         .addOutput({
           to: wallet.tokenAddress,
           amount: 1000n,
@@ -84,6 +109,11 @@ export default function BuyPanel({
             amount: buyAmount,
             category: tokenUtxo.token.category,
           },
+        })
+        // User's change (remaining BCH)
+        .addOutput({
+          to: wallet.address,
+          amount: userUtxo.satoshis - buyCost - txFee - 1000n,
         });
 
       const result = await tx.send();

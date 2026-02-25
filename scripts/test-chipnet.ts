@@ -48,6 +48,7 @@ async function main() {
     creatorPkh: wallet.pubkeyHash,
     basePrice,
     slope,
+    totalSupply,
   });
 
   console.log('Bonding Curve Contract:');

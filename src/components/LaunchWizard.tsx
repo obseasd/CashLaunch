@@ -54,7 +54,7 @@ export default function LaunchWizard() {
       const provider = new ElectrumNetworkProvider("chipnet");
       const contract = new Contract(
         artifact,
-        [wallet.pubkeyHash, BigInt(CURVE.basePrice), BigInt(CURVE.slope)],
+        [wallet.pubkeyHash, BigInt(CURVE.basePrice), BigInt(CURVE.slope), BigInt(CURVE.totalSupply)],
         { provider }
       );
 

@@ -1,10 +1,11 @@
 pragma cashscript ^0.12.0;
 
 // CashLaunch Bonding Curve Covenant
-// Holds CashTokens + BCH. Enforces linear pricing: price(n) = basePrice + n * slope
+// Holds CashTokens + BCH. Enforces linear pricing: price(n) = basePrice + slope * n
+// where n is the number of tokens already sold.
 // All math is integer-only (sats and token units).
 
-contract BondingCurve(bytes20 creatorPkh, int basePrice, int slope) {
+contract BondingCurve(bytes20 creatorPkh, int basePrice, int slope, int totalSupply) {
 
     // Buy tokens from the contract.
     // Buyer sends BCH, receives tokens. Contract preserves itself (covenant).
@@ -26,16 +27,14 @@ contract BondingCurve(bytes20 creatorPkh, int basePrice, int slope) {
         int bchAdded = tx.outputs[this.activeInputIndex].value
                      - tx.inputs[this.activeInputIndex].value;
 
-        // Current supply held by contract (before sale)
-        int currentSupply = tx.inputs[this.activeInputIndex].tokenAmount;
+        // Number of tokens already sold (outside the contract)
+        int sold = totalSupply - tx.inputs[this.activeInputIndex].tokenAmount;
 
-        // Linear bonding curve cost calculation (integer math):
-        // Average price = basePrice + slope * (currentSupply - tokensBought/2)
-        // Total cost = tokensBought * averagePrice
-        // To avoid truncation issues, multiply first then divide:
-        // cost = tokensBought * basePrice + slope * tokensBought * (2 * currentSupply - tokensBought) / 2
+        // Linear bonding curve cost:
+        // Integrate price(x) = basePrice + slope * x from sold to (sold + tokensBought)
+        // cost = tokensBought * basePrice + slope * tokensBought * (2 * sold + tokensBought) / 2
         int cost = tokensBought * basePrice
-                 + slope * tokensBought * (2 * currentSupply - tokensBought) / 2;
+                 + slope * tokensBought * (2 * sold + tokensBought) / 2;
 
         require(bchAdded >= cost);
     }
@@ -60,14 +59,13 @@ contract BondingCurve(bytes20 creatorPkh, int basePrice, int slope) {
         int bchRemoved = tx.inputs[this.activeInputIndex].value
                        - tx.outputs[this.activeInputIndex].value;
 
-        // Current supply held by contract (before sell)
-        int currentSupply = tx.inputs[this.activeInputIndex].tokenAmount;
+        // Number of tokens already sold (outside the contract) BEFORE this sell
+        int sold = totalSupply - tx.inputs[this.activeInputIndex].tokenAmount;
 
-        // Linear bonding curve refund calculation (reverse of buy):
-        // Integrating price from currentSupply to (currentSupply + tokensReturned)
-        // refund = tokensReturned * basePrice + slope * tokensReturned * (2 * currentSupply + tokensReturned) / 2
+        // Refund: integrate price(x) from (sold - tokensReturned) to sold
+        // refund = tokensReturned * basePrice + slope * tokensReturned * (2 * sold - tokensReturned) / 2
         int refund = tokensReturned * basePrice
-                   + slope * tokensReturned * (2 * currentSupply + tokensReturned) / 2;
+                   + slope * tokensReturned * (2 * sold - tokensReturned) / 2;
 
         require(bchRemoved <= refund);
     }

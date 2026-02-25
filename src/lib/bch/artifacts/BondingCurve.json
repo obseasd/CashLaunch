@@ -12,6 +12,10 @@
     {
       "name": "slope",
       "type": "int"
+    },
+    {
+      "name": "totalSupply",
+      "type": "int"
     }
   ],
   "abi": [
@@ -37,52 +41,52 @@
       ]
     }
   ],
-  "bytecode": "OP_3 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_OUTPUTBYTECODE OP_INPUTINDEX OP_UTXOBYTECODE OP_EQUALVERIFY OP_INPUTINDEX OP_OUTPUTTOKENCATEGORY OP_INPUTINDEX OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_INPUTINDEX OP_UTXOTOKENAMOUNT OP_INPUTINDEX OP_OUTPUTTOKENAMOUNT OP_SUB OP_DUP OP_0 OP_GREATERTHAN OP_VERIFY OP_INPUTINDEX OP_OUTPUTVALUE OP_INPUTINDEX OP_UTXOVALUE OP_SUB OP_INPUTINDEX OP_UTXOTOKENAMOUNT OP_2 OP_PICK OP_5 OP_ROLL OP_MUL OP_5 OP_ROLL OP_4 OP_PICK OP_MUL OP_2 OP_3 OP_ROLL OP_MUL OP_4 OP_ROLL OP_SUB OP_MUL OP_2 OP_DIV OP_ADD OP_GREATERTHANOREQUAL OP_NIP OP_NIP OP_ELSE OP_3 OP_PICK OP_1 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_OUTPUTBYTECODE OP_INPUTINDEX OP_UTXOBYTECODE OP_EQUALVERIFY OP_INPUTINDEX OP_OUTPUTTOKENCATEGORY OP_INPUTINDEX OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_INPUTINDEX OP_OUTPUTTOKENAMOUNT OP_INPUTINDEX OP_UTXOTOKENAMOUNT OP_SUB OP_DUP OP_0 OP_GREATERTHAN OP_VERIFY OP_INPUTINDEX OP_UTXOVALUE OP_INPUTINDEX OP_OUTPUTVALUE OP_SUB OP_INPUTINDEX OP_UTXOTOKENAMOUNT OP_2 OP_PICK OP_5 OP_ROLL OP_MUL OP_5 OP_ROLL OP_4 OP_PICK OP_MUL OP_2 OP_3 OP_ROLL OP_MUL OP_4 OP_ROLL OP_ADD OP_MUL OP_2 OP_DIV OP_ADD OP_LESSTHANOREQUAL OP_NIP OP_NIP OP_ELSE OP_3 OP_ROLL OP_2 OP_NUMEQUALVERIFY OP_3 OP_PICK OP_HASH160 OP_EQUALVERIFY OP_2SWAP OP_CHECKSIG OP_NIP OP_NIP OP_ENDIF OP_ENDIF",
-  "source": "pragma cashscript ^0.12.0;\n\n// CashLaunch Bonding Curve Covenant\n// Holds CashTokens + BCH. Enforces linear pricing: price(n) = basePrice + n * slope\n// All math is integer-only (sats and token units).\n\ncontract BondingCurve(bytes20 creatorPkh, int basePrice, int slope) {\n\n    // Buy tokens from the contract.\n    // Buyer sends BCH, receives tokens. Contract preserves itself (covenant).\n    function buy() {\n        // COVENANT: output must preserve the contract's locking bytecode\n        require(tx.outputs[this.activeInputIndex].lockingBytecode ==\n                tx.inputs[this.activeInputIndex].lockingBytecode);\n\n        // Same token category must be preserved\n        require(tx.outputs[this.activeInputIndex].tokenCategory ==\n                tx.inputs[this.activeInputIndex].tokenCategory);\n\n        // Calculate how many tokens the buyer is taking\n        int tokensBought = tx.inputs[this.activeInputIndex].tokenAmount\n                         - tx.outputs[this.activeInputIndex].tokenAmount;\n        require(tokensBought > 0);\n\n        // Calculate BCH added to the contract\n        int bchAdded = tx.outputs[this.activeInputIndex].value\n                     - tx.inputs[this.activeInputIndex].value;\n\n        // Current supply held by contract (before sale)\n        int currentSupply = tx.inputs[this.activeInputIndex].tokenAmount;\n\n        // Linear bonding curve cost calculation (integer math):\n        // Average price = basePrice + slope * (currentSupply - tokensBought/2)\n        // Total cost = tokensBought * averagePrice\n        // To avoid truncation issues, multiply first then divide:\n        // cost = tokensBought * basePrice + slope * tokensBought * (2 * currentSupply - tokensBought) / 2\n        int cost = tokensBought * basePrice\n                 + slope * tokensBought * (2 * currentSupply - tokensBought) / 2;\n\n        require(bchAdded >= cost);\n    }\n\n    // Sell tokens back to the contract.\n    // Seller returns tokens, receives BCH. Contract preserves itself (covenant).\n    function sell() {\n        // COVENANT: output must preserve the contract's locking bytecode\n        require(tx.outputs[this.activeInputIndex].lockingBytecode ==\n                tx.inputs[this.activeInputIndex].lockingBytecode);\n\n        // Same token category must be preserved\n        require(tx.outputs[this.activeInputIndex].tokenCategory ==\n                tx.inputs[this.activeInputIndex].tokenCategory);\n\n        // Calculate how many tokens are being returned to the contract\n        int tokensReturned = tx.outputs[this.activeInputIndex].tokenAmount\n                           - tx.inputs[this.activeInputIndex].tokenAmount;\n        require(tokensReturned > 0);\n\n        // Calculate BCH removed from the contract\n        int bchRemoved = tx.inputs[this.activeInputIndex].value\n                       - tx.outputs[this.activeInputIndex].value;\n\n        // Current supply held by contract (before sell)\n        int currentSupply = tx.inputs[this.activeInputIndex].tokenAmount;\n\n        // Linear bonding curve refund calculation (reverse of buy):\n        // Integrating price from currentSupply to (currentSupply + tokensReturned)\n        // refund = tokensReturned * basePrice + slope * tokensReturned * (2 * currentSupply + tokensReturned) / 2\n        int refund = tokensReturned * basePrice\n                   + slope * tokensReturned * (2 * currentSupply + tokensReturned) / 2;\n\n        require(bchRemoved <= refund);\n    }\n\n    // Creator can withdraw all funds + remaining tokens\n    function withdraw(pubkey pk, sig s) {\n        require(hash160(pk) == creatorPkh);\n        require(checkSig(s, pk));\n    }\n}\n",
+  "bytecode": "OP_4 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_OUTPUTBYTECODE OP_INPUTINDEX OP_UTXOBYTECODE OP_EQUALVERIFY OP_INPUTINDEX OP_OUTPUTTOKENCATEGORY OP_INPUTINDEX OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_INPUTINDEX OP_UTXOTOKENAMOUNT OP_INPUTINDEX OP_OUTPUTTOKENAMOUNT OP_SUB OP_DUP OP_0 OP_GREATERTHAN OP_VERIFY OP_INPUTINDEX OP_OUTPUTVALUE OP_INPUTINDEX OP_UTXOVALUE OP_SUB OP_5 OP_ROLL OP_INPUTINDEX OP_UTXOTOKENAMOUNT OP_SUB OP_2 OP_PICK OP_5 OP_ROLL OP_MUL OP_5 OP_ROLL OP_4 OP_PICK OP_MUL OP_2 OP_3 OP_ROLL OP_MUL OP_4 OP_ROLL OP_ADD OP_MUL OP_2 OP_DIV OP_ADD OP_GREATERTHANOREQUAL OP_NIP OP_NIP OP_ELSE OP_4 OP_PICK OP_1 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_OUTPUTBYTECODE OP_INPUTINDEX OP_UTXOBYTECODE OP_EQUALVERIFY OP_INPUTINDEX OP_OUTPUTTOKENCATEGORY OP_INPUTINDEX OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_INPUTINDEX OP_OUTPUTTOKENAMOUNT OP_INPUTINDEX OP_UTXOTOKENAMOUNT OP_SUB OP_DUP OP_0 OP_GREATERTHAN OP_VERIFY OP_INPUTINDEX OP_UTXOVALUE OP_INPUTINDEX OP_OUTPUTVALUE OP_SUB OP_5 OP_ROLL OP_INPUTINDEX OP_UTXOTOKENAMOUNT OP_SUB OP_2 OP_PICK OP_5 OP_ROLL OP_MUL OP_5 OP_ROLL OP_4 OP_PICK OP_MUL OP_2 OP_3 OP_ROLL OP_MUL OP_4 OP_ROLL OP_SUB OP_MUL OP_2 OP_DIV OP_ADD OP_LESSTHANOREQUAL OP_NIP OP_NIP OP_ELSE OP_4 OP_ROLL OP_2 OP_NUMEQUALVERIFY OP_4 OP_PICK OP_HASH160 OP_EQUALVERIFY OP_4 OP_ROLL OP_4 OP_ROLL OP_CHECKSIG OP_NIP OP_NIP OP_NIP OP_ENDIF OP_ENDIF",
+  "source": "pragma cashscript ^0.12.0;\n\n// CashLaunch Bonding Curve Covenant\n// Holds CashTokens + BCH. Enforces linear pricing: price(n) = basePrice + slope * n\n// where n is the number of tokens already sold.\n// All math is integer-only (sats and token units).\n\ncontract BondingCurve(bytes20 creatorPkh, int basePrice, int slope, int totalSupply) {\n\n    // Buy tokens from the contract.\n    // Buyer sends BCH, receives tokens. Contract preserves itself (covenant).\n    function buy() {\n        // COVENANT: output must preserve the contract's locking bytecode\n        require(tx.outputs[this.activeInputIndex].lockingBytecode ==\n                tx.inputs[this.activeInputIndex].lockingBytecode);\n\n        // Same token category must be preserved\n        require(tx.outputs[this.activeInputIndex].tokenCategory ==\n                tx.inputs[this.activeInputIndex].tokenCategory);\n\n        // Calculate how many tokens the buyer is taking\n        int tokensBought = tx.inputs[this.activeInputIndex].tokenAmount\n                         - tx.outputs[this.activeInputIndex].tokenAmount;\n        require(tokensBought > 0);\n\n        // Calculate BCH added to the contract\n        int bchAdded = tx.outputs[this.activeInputIndex].value\n                     - tx.inputs[this.activeInputIndex].value;\n\n        // Number of tokens already sold (outside the contract)\n        int sold = totalSupply - tx.inputs[this.activeInputIndex].tokenAmount;\n\n        // Linear bonding curve cost:\n        // Integrate price(x) = basePrice + slope * x from sold to (sold + tokensBought)\n        // cost = tokensBought * basePrice + slope * tokensBought * (2 * sold + tokensBought) / 2\n        int cost = tokensBought * basePrice\n                 + slope * tokensBought * (2 * sold + tokensBought) / 2;\n\n        require(bchAdded >= cost);\n    }\n\n    // Sell tokens back to the contract.\n    // Seller returns tokens, receives BCH. Contract preserves itself (covenant).\n    function sell() {\n        // COVENANT: output must preserve the contract's locking bytecode\n        require(tx.outputs[this.activeInputIndex].lockingBytecode ==\n                tx.inputs[this.activeInputIndex].lockingBytecode);\n\n        // Same token category must be preserved\n        require(tx.outputs[this.activeInputIndex].tokenCategory ==\n                tx.inputs[this.activeInputIndex].tokenCategory);\n\n        // Calculate how many tokens are being returned to the contract\n        int tokensReturned = tx.outputs[this.activeInputIndex].tokenAmount\n                           - tx.inputs[this.activeInputIndex].tokenAmount;\n        require(tokensReturned > 0);\n\n        // Calculate BCH removed from the contract\n        int bchRemoved = tx.inputs[this.activeInputIndex].value\n                       - tx.outputs[this.activeInputIndex].value;\n\n        // Number of tokens already sold (outside the contract) BEFORE this sell\n        int sold = totalSupply - tx.inputs[this.activeInputIndex].tokenAmount;\n\n        // Refund: integrate price(x) from (sold - tokensReturned) to sold\n        // refund = tokensReturned * basePrice + slope * tokensReturned * (2 * sold - tokensReturned) / 2\n        int refund = tokensReturned * basePrice\n                   + slope * tokensReturned * (2 * sold - tokensReturned) / 2;\n\n        require(bchRemoved <= refund);\n    }\n\n    // Creator can withdraw all funds + remaining tokens\n    function withdraw(pubkey pk, sig s) {\n        require(hash160(pk) == creatorPkh);\n        require(checkSig(s, pk));\n    }\n}\n",
   "debug": {
-    "bytecode": "5379009c63c0cdc0c788c0d1c0ce88c0d0c0d3947600a069c0ccc0c694c0d05279557a95557a54799552537a95547a9495529693a27777675379519c63c0cdc0c788c0d1c0ce88c0d3c0d0947600a069c0c6c0cc94c0d05279557a95557a54799552537a95547a9395529693a1777767537a529d5379a98872ac77776868",
-    "sourceMap": "11:4:41:5;;;;;13:27:13:48;:16::65:1;14:26:14:47:0;:16::64:1;13:8::66;17:27:17:48:0;:16::63:1;18:26:18:47:0;:16::62:1;17:8::64;21:37:21:58:0;:27::71:1;22:38:22:59:0;:27::72:1;21;23:16:23:28:0;:31::32;:16:::1;:8::34;26:34:26:55:0;:23::62:1;27:33:27:54:0;:23::61:1;26;30:38:30:59:0;:28::72:1;37:19:37:31:0;;:34::43;;:19:::1;38::38:24:0;;:27::39;;:19:::1;:43::44:0;:47::60;;:43:::1;:63::75:0;;:43:::1;:19::76;:79::80:0;:19:::1;37;40:8:40:34;11:4:41:5;;;45::73::0;;;;;47:27:47:48;:16::65:1;48:26:48:47:0;:16::64:1;47:8::66;51:27:51:48:0;:16::63:1;52:26:52:47:0;:16::62:1;51:8::64;55:40:55:61:0;:29::74:1;56:39:56:60:0;:29::73:1;55;57:16:57:30:0;:33::34;:16:::1;:8::36;60:35:60:56:0;:25::63:1;61:36:61:57:0;:25::64:1;60;64:38:64:59:0;:28::72:1;69:21:69:35:0;;:38::47;;:21:::1;70::70:26:0;;:29::43;;:21:::1;:47::48:0;:51::64;;:47:::1;:67::81:0;;:47:::1;:21::82;:85::86:0;:21:::1;69;72:8:72:38;45:4:73:5;;;76::79::0;;;;77:24:77:26;;:16::27:1;:8::43;78:25:78:30:0;:8::33:1;76:4:79:5;;7:0:80:1;",
+    "bytecode": "5479009c63c0cdc0c788c0d1c0ce88c0d0c0d3947600a069c0ccc0c694557ac0d0945279557a95557a54799552537a95547a9395529693a27777675479519c63c0cdc0c788c0d1c0ce88c0d3c0d0947600a069c0c6c0cc94557ac0d0945279557a95557a54799552537a95547a9495529693a1777767547a529d5479a988547a547aac7777776868",
+    "sourceMap": "12:4:40:5;;;;;14:27:14:48;:16::65:1;15:26:15:47:0;:16::64:1;14:8::66;18:27:18:48:0;:16::63:1;19:26:19:47:0;:16::62:1;18:8::64;22:37:22:58:0;:27::71:1;23:38:23:59:0;:27::72:1;22;24:16:24:28:0;:31::32;:16:::1;:8::34;27:34:27:55:0;:23::62:1;28:33:28:54:0;:23::61:1;27;31:19:31:30:0;;:43::64;:33::77:1;:19;36::36:31:0;;:34::43;;:19:::1;37::37:24:0;;:27::39;;:19:::1;:43::44:0;:47::51;;:43:::1;:54::66:0;;:43:::1;:19::67;:70::71:0;:19:::1;36;39:8:39:34;12:4:40:5;;;44::71::0;;;;;46:27:46:48;:16::65:1;47:26:47:47:0;:16::64:1;46:8::66;50:27:50:48:0;:16::63:1;51:26:51:47:0;:16::62:1;50:8::64;54:40:54:61:0;:29::74:1;55:39:55:60:0;:29::73:1;54;56:16:56:30:0;:33::34;:16:::1;:8::36;59:35:59:56:0;:25::63:1;60:36:60:57:0;:25::64:1;59;63:19:63:30:0;;:43::64;:33::77:1;:19;67:21:67:35:0;;:38::47;;:21:::1;68::68:26:0;;:29::43;;:21:::1;:47::48:0;:51::55;;:47:::1;:58::72:0;;:47:::1;:21::73;:76::77:0;:21:::1;67;70:8:70:38;44:4:71:5;;;74::77::0;;;;75:24:75:26;;:16::27:1;:8::43;76:25:76:26:0;;:28::30;;:8::33:1;74:4:77:5;;;8:0:78:1;",
     "logs": [],
     "requires": [
       {
-        "ip": 12,
-        "line": 13
+        "ip": 13,
+        "line": 14
       },
       {
-        "ip": 17,
-        "line": 17
+        "ip": 18,
+        "line": 18
       },
       {
-        "ip": 26,
-        "line": 23
+        "ip": 27,
+        "line": 24
       },
       {
-        "ip": 56,
-        "line": 40
+        "ip": 60,
+        "line": 39
       },
       {
-        "ip": 68,
-        "line": 47
+        "ip": 72,
+        "line": 46
       },
       {
-        "ip": 73,
-        "line": 51
+        "ip": 77,
+        "line": 50
       },
       {
-        "ip": 82,
-        "line": 57
+        "ip": 86,
+        "line": 56
       },
       {
-        "ip": 112,
-        "line": 72
+        "ip": 119,
+        "line": 70
       },
       {
-        "ip": 122,
-        "line": 77
+        "ip": 129,
+        "line": 75
       },
       {
-        "ip": 125,
-        "line": 78
+        "ip": 135,
+        "line": 76
       }
     ]
   },
@@ -90,5 +94,5 @@
     "name": "cashc",
     "version": "0.12.1"
   },
-  "updatedAt": "2026-02-23T18:12:28.098Z"
+  "updatedAt": "2026-02-25T13:07:35.813Z"
 }

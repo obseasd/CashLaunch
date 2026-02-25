@@ -10,6 +10,7 @@ export default function Header() {
   const { wallet, connect, disconnect, isConnected } = useWallet();
   const [showMnemonicInput, setShowMnemonicInput] = useState(false);
   const [mnemonicInput, setMnemonicInput] = useState("");
+  const [copied, setCopied] = useState(false);
   const pathname = usePathname();
 
   const shortAddr = wallet
@@ -63,12 +64,20 @@ export default function Header() {
           <div className="flex items-center gap-3">
             {isConnected ? (
               <>
-                <div className="hidden md:flex items-center gap-2 bg-surface-2 rounded-xl px-3 py-1.5">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(wallet!.address);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }}
+                  title={wallet!.address}
+                  className="hidden md:flex items-center gap-2 bg-surface-2 rounded-xl px-3 py-1.5 hover:bg-surface-3 transition-colors cursor-pointer"
+                >
                   <div className="w-2 h-2 rounded-full bg-brand animate-pulse" />
                   <span className="text-xs text-text-secondary font-mono">
-                    {shortAddr}
+                    {copied ? "Copied!" : shortAddr}
                   </span>
-                </div>
+                </button>
                 <button
                   onClick={disconnect}
                   className="text-xs text-text-muted hover:text-red-400 transition-colors px-2 py-1"

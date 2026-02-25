@@ -75,7 +75,7 @@ export default function TokenPage() {
 
         const contract = new Contract(
           artifact,
-          [pkh, BigInt(token!.basePrice), BigInt(token!.slope)],
+          [pkh, BigInt(token!.basePrice), BigInt(token!.slope), BigInt(token!.totalSupply)],
           { provider }
         );
 
@@ -305,6 +305,7 @@ export default function TokenPage() {
               <BuyPanel
                 basePrice={token.basePrice}
                 slope={token.slope}
+                totalSupply={token.totalSupply}
                 currentSupply={currentSupply}
                 categoryId={token.categoryId}
                 onBuy={() => setRefreshKey((k) => k + 1)}
@@ -313,6 +314,7 @@ export default function TokenPage() {
               <SellPanel
                 basePrice={token.basePrice}
                 slope={token.slope}
+                totalSupply={token.totalSupply}
                 currentSupply={currentSupply}
                 categoryId={token.categoryId}
                 onSell={() => setRefreshKey((k) => k + 1)}

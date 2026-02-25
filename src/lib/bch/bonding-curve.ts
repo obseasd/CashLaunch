@@ -7,6 +7,7 @@ export interface BondingCurveParams {
   creatorPkh: Uint8Array;
   basePrice: bigint;  // sats per token (starting price)
   slope: bigint;      // price increase per token in sats
+  totalSupply: bigint; // total token supply
 }
 
 export interface BondingCurveInstance {
@@ -47,7 +48,7 @@ export function createBondingCurve(params: BondingCurveParams): BondingCurveInst
 
   const contract = new Contract(
     artifact,
-    [params.creatorPkh, params.basePrice, params.slope],
+    [params.creatorPkh, params.basePrice, params.slope, params.totalSupply],
     { provider }
   );
 

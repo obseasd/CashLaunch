@@ -6,6 +6,7 @@ import { useWallet } from "@/context/WalletContext";
 interface Props {
   basePrice: number;
   slope: number;
+  totalSupply: number;
   currentSupply: number;
   categoryId: string;
   onSell?: (amount: number, txId: string) => void;
@@ -14,6 +15,7 @@ interface Props {
 export default function SellPanel({
   basePrice,
   slope,
+  totalSupply,
   currentSupply,
   categoryId,
   onSell,
@@ -27,12 +29,13 @@ export default function SellPanel({
 
   const tokenAmount = parseInt(amount) || 0;
 
-  // Revenue calculation: reverse of buy — integrating from currentSupply to (currentSupply + tokensReturned)
-  const newSupply = currentSupply + tokenAmount;
+  // Revenue: sold tokens BEFORE sell = totalSupply - currentSupply
+  // Refund integrates price from (sold - tokensReturned) to sold
+  const sold = totalSupply - currentSupply;
   const revenue =
     tokenAmount > 0
       ? tokenAmount * basePrice +
-        (slope * tokenAmount * (2 * newSupply - tokenAmount)) / 2
+        (slope * tokenAmount * (2 * sold - tokenAmount)) / 2
       : 0;
   const revenueBch = revenue / 1e8;
 
@@ -51,7 +54,7 @@ export default function SellPanel({
       const provider = new ElectrumNetworkProvider("chipnet");
       const contract = new Contract(
         artifact,
-        [wallet.pubkeyHash, BigInt(basePrice), BigInt(slope)],
+        [wallet.pubkeyHash, BigInt(basePrice), BigInt(slope), BigInt(totalSupply)],
         { provider }
       );
 
@@ -73,11 +76,12 @@ export default function SellPanel({
         throw new Error("You don't have enough tokens to sell");
 
       const sellAmount = BigInt(tokenAmount);
+      const soldBefore = BigInt(totalSupply) - contractTokenUtxo.token.amount;
       const sellRefund =
         sellAmount * BigInt(basePrice) +
         (BigInt(slope) *
           sellAmount *
-          (2n * contractTokenUtxo.token.amount + sellAmount)) /
+          (2n * soldBefore - sellAmount)) /
           2n;
 
       // Ensure contract has enough BCH to pay the refund
