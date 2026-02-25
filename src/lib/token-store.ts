@@ -5,12 +5,12 @@
 
 // ── Fixed bonding curve parameters (pump.fun style — not customizable) ──
 export const CURVE = {
-  totalSupply: 1_000_000,     // 1M tokens
+  totalSupply: 10_000,        // 10K tokens
   basePrice: 100,             // 100 sats starting price
   slope: 1,                   // +1 sat per token sold
   // Start price: 100 sats
-  // End price:   1,000,100 sats (~0.01 BCH)
-  // ~15x at 15% sold, ~100x at midpoint
+  // End price:   10,100 sats
+  // Total to bond: ~51M sats (~0.51 BCH)
 } as const;
 
 export interface LaunchedToken {
