@@ -47,28 +47,7 @@ export default function LaunchWizard() {
     setError("");
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000);
-
-      const genesisRes = await fetch("/api/token/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mnemonic: wallet.mnemonic,
-          supply: CURVE.totalSupply,
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!genesisRes.ok) {
-        const errData = await genesisRes.json();
-        throw new Error(errData.error || "Token genesis failed");
-      }
-
-      const { categoryId, txId } = await genesisRes.json();
-
+      // Compute contract address client-side first
       const { Contract, ElectrumNetworkProvider } = await import("cashscript");
       const artifact = (await import("@/lib/bch/artifacts/BondingCurve.json")).default;
 
@@ -79,27 +58,29 @@ export default function LaunchWizard() {
         { provider }
       );
 
-      const controller2 = new AbortController();
-      const timeout2 = setTimeout(() => controller2.abort(), 45000);
+      // Single API call: genesis + wait + fund contract
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 55000);
 
-      const fundRes = await fetch("/api/token/fund-contract", {
+      const launchRes = await fetch("/api/token/launch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mnemonic: wallet.mnemonic,
-          categoryId,
+          supply: CURVE.totalSupply,
           contractTokenAddress: contract.tokenAddress,
-          amount: CURVE.totalSupply,
         }),
-        signal: controller2.signal,
+        signal: controller.signal,
       });
 
-      clearTimeout(timeout2);
+      clearTimeout(timeout);
 
-      if (!fundRes.ok) {
-        const errData = await fundRes.json();
-        throw new Error(errData.error || "Failed to fund contract");
+      if (!launchRes.ok) {
+        const errData = await launchRes.json();
+        throw new Error(errData.error || "Token launch failed");
       }
+
+      const { categoryId, genesisTxId } = await launchRes.json();
 
       saveToken({
         categoryId,
@@ -114,7 +95,7 @@ export default function LaunchWizard() {
         logoUrl: logoPreview || undefined,
       });
 
-      setResult({ categoryId, txId });
+      setResult({ categoryId, txId: genesisTxId });
       setStep(3);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {

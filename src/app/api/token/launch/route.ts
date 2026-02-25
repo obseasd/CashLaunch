@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TestNetWallet, DefaultProvider } from "mainnet-js";
+import { TestNetWallet, TokenSendRequest, DefaultProvider } from "mainnet-js";
 
 // Configure chipnet Electrum servers (multiple for redundancy)
 DefaultProvider.servers.testnet = [
@@ -11,11 +11,11 @@ export const maxDuration = 60; // Vercel serverless timeout
 
 export async function POST(req: NextRequest) {
   try {
-    const { mnemonic, supply } = await req.json();
+    const { mnemonic, supply, contractTokenAddress } = await req.json();
 
-    if (!mnemonic || !supply) {
+    if (!mnemonic || !supply || !contractTokenAddress) {
       return NextResponse.json(
-        { error: "Missing mnemonic or supply" },
+        { error: "Missing mnemonic, supply, or contractTokenAddress" },
         { status: 400 }
       );
     }
@@ -33,27 +33,42 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // BCH token genesis requires a UTXO at vout=0.
-    // Consolidate UTXOs by sending to self first — this creates a fresh vout=0 UTXO.
+    // Step 1: Consolidate UTXOs — token genesis requires a UTXO at vout=0
     try {
       await wallet.sendMax(wallet.cashaddr!);
-      // Wait for mempool propagation
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 2000));
     } catch {
-      // Consolidation may fail if already have vout=0, continue anyway
+      // May fail if already consolidated, continue
     }
 
+    // Step 2: Token genesis
     const genesisResult = await wallet.tokenGenesis({
       cashaddr: wallet.tokenaddr!,
       amount: BigInt(supply),
     });
 
+    // In CashTokens, the category ID is the txid of the consumed vout=0 UTXO,
+    // NOT the genesis transaction itself. mainnet-js returns it in categories[0].
     const categoryId = genesisResult.categories![0];
-    const txId = genesisResult.txId!;
+    const genesisTxId = genesisResult.txId!;
+
+    // Step 3: Wait for genesis tx to propagate in mempool
+    await new Promise((r) => setTimeout(r, 3000));
+
+    // Step 4: Send all tokens to the bonding curve contract
+    const fundResult = await wallet.send([
+      new TokenSendRequest({
+        cashaddr: contractTokenAddress,
+        amount: BigInt(supply),
+        category: categoryId,
+      }),
+    ]);
+    const fundTxId = fundResult.txId!;
 
     return NextResponse.json({
       categoryId,
-      txId,
+      genesisTxId,
+      fundTxId,
       address: wallet.cashaddr,
       tokenAddress: wallet.tokenaddr,
     });
