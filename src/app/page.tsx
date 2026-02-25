@@ -86,6 +86,35 @@ export default function Home() {
         </div>
       </div>
 
+      {/* How it works */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
+        {[
+          {
+            step: "1",
+            title: "Connect Wallet",
+            desc: "Click Connect Wallet to create a free chipnet wallet. Get test BCH from the faucet.",
+          },
+          {
+            step: "2",
+            title: "Launch a Token",
+            desc: "Pick a name and symbol. Your token deploys with automatic bonding curve pricing.",
+          },
+          {
+            step: "3",
+            title: "Buy & Sell",
+            desc: "Trade tokens on-chain. Price rises as people buy, and falls when they sell.",
+          },
+        ].map(({ step, title, desc }) => (
+          <div key={step} className="glass-card p-5 text-center">
+            <div className="w-8 h-8 rounded-full bg-brand/15 text-brand font-bold text-sm flex items-center justify-center mx-auto mb-3">
+              {step}
+            </div>
+            <h3 className="text-sm font-semibold text-text-primary mb-1">{title}</h3>
+            <p className="text-xs text-text-muted leading-relaxed">{desc}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Token grid */}
       <div id="tokens" className="scroll-mt-20">
         <div className="flex items-center justify-between mb-5">
